@@ -1,0 +1,38 @@
+# ESP-IDF build output
+/build/
+/*.bin
+/*.elf
+/*.map
+/*.hex
+/*.log
+
+# CMake generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# Project configuration
+sdkconfig
+sdkconfig.old
+
+# ESP-IDF Python environment
+.env/
+.venv/
+__pycache__/
+*.pyc
+
+# Visual Studio Code settings
+.vscode/
+
+# Misc
+*.swp
+*.swo
+*.bak
+*.tmp
+*.orig
+*.d
+
+# Ignore generated documentation
+/html/
+/latex/
