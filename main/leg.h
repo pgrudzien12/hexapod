@@ -18,16 +18,29 @@ typedef enum {
 	LEG_SERVO_TIBIA = 2,
 } leg_servo_t;
 
-// Initialize the leg servos on the given GPIO pins.
-// Returns ESP_OK on success.
-esp_err_t leg_configure(int servo1_gpio, int servo2_gpio, int servo3_gpio);
+// Opaque leg descriptor
+typedef struct leg_s* leg_handle_t;
+
+// Configuration for a leg: GPIOs and segment lengths (units up to you, e.g., mm)
+typedef struct {
+	int gpio_coxa;
+	int gpio_femur;
+	int gpio_tibia;
+	float len_coxa;
+	float len_femur;
+	float len_tibia;
+	int group_id; // MCPWM group to use (default 0)
+} leg_config_t;
+
+// Create/configure a leg and return a descriptor via out_leg
+esp_err_t leg_configure(const leg_config_t* cfg, leg_handle_t* out_leg);
 
 // Drive all three servos to their neutral position (1.5ms pulse, ~0 deg).
-esp_err_t leg_test_neutral(void);
+esp_err_t leg_test_neutral(leg_handle_t leg);
 
 // Set angle for a specific joint in radians (clamped to supported range).
 // Returns ESP_ERR_INVALID_STATE if leg is not configured yet.
-esp_err_t leg_set_angle_rad(leg_servo_t joint, float radians);
+esp_err_t leg_set_angle_rad(leg_handle_t leg, leg_servo_t joint, float radians);
 
 #ifdef __cplusplus
 }
