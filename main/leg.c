@@ -50,6 +50,9 @@ typedef struct leg_s {
     float min_rad_coxa, max_rad_coxa;
     float min_rad_femur, max_rad_femur;
     float min_rad_tibia, max_rad_tibia;
+    // calibration offsets (radians)
+    float femur_offset_rad; // shoulder offset
+    float tibia_offset_rad; // knee/ankle offset
 } leg_ctx_t;
 
 static inline uint32_t angle_to_compare_rad(float radians)
@@ -78,6 +81,8 @@ esp_err_t leg_configure(const leg_config_t* cfg, leg_handle_t* out_leg)
     leg->len_coxa = cfg->len_coxa;
     leg->len_femur = cfg->len_femur;
     leg->len_tibia = cfg->len_tibia;
+    leg->femur_offset_rad = cfg->femur_offset_rad;
+    leg->tibia_offset_rad = cfg->tibia_offset_rad;
     ESP_LOGD(TAG, "Leg lengths (mm): coxa=%.1f, femur=%.1f, tibia=%.1f", leg->len_coxa, leg->len_femur, leg->len_tibia);
 
     // Set angle limits in radians (defaults to [-pi/2, +pi/2] if unset by providing 0/0)
@@ -91,6 +96,9 @@ esp_err_t leg_configure(const leg_config_t* cfg, leg_handle_t* out_leg)
     if (leg->min_rad_coxa > leg->max_rad_coxa) { float t = leg->min_rad_coxa; leg->min_rad_coxa = leg->max_rad_coxa; leg->max_rad_coxa = t; }
     if (leg->min_rad_femur > leg->max_rad_femur) { float t = leg->min_rad_femur; leg->min_rad_femur = leg->max_rad_femur; leg->max_rad_femur = t; }
     if (leg->min_rad_tibia > leg->max_rad_tibia) { float t = leg->min_rad_tibia; leg->min_rad_tibia = leg->max_rad_tibia; leg->max_rad_tibia = t; }
+    // Default offsets to 0 if not provided
+    if (isnan(leg->femur_offset_rad)) leg->femur_offset_rad = 0.0f;
+    if (isnan(leg->tibia_offset_rad)) leg->tibia_offset_rad = 0.0f;
 
     // Configure and start the MCPWM timer
     mcpwm_timer_config_t timer_config = {
@@ -219,17 +227,17 @@ esp_err_t leg_move_xyz(leg_handle_t handle, float x, float y, float z)
     float d = clampf(hypotf(px, pz), fabsf(L1 - L2), L1 + L2);
 
     float cosK = (L2*L2 + L1*L1 - d*d) / (2*L2*L1);
+    cosK = clampf(cosK, -1.0f, 1.0f);
     float ankle_angle = acosf(cosK);
     ESP_LOGD(TAG, "IK: d=%.1f, cosK=%.3f, ankle=%.3f deg", d, cosK, ankle_angle * (180.0f / M_PI));
-    float ankle_offset = 1.0160719600939494f;
-    float ankle = -(ankle_angle - ankle_offset);
+    float ankle = -(ankle_angle - leg->tibia_offset_rad);
     ESP_LOGD(TAG, "IK: d=%.1f, ankle=%.3f deg", d, ankle * (180.0f / M_PI));
 
     float cosPhi = (L1*L1 + d*d - L2*L2) / (2*L1*d);
+    cosPhi = clampf(cosPhi, -1.0f, 1.0f);
     float phi = acosf(cosPhi);
-    float knee_offset = 0.40006799f;
     float alpha = M_PI / 2 - atan2f(d, pz);
-    float knee = phi - knee_offset - alpha;
+    float knee = phi - leg->femur_offset_rad - alpha;
     ESP_LOGD(TAG, "IK: d=%.1f, phi=%.3f deg, knee=%.3f deg, alpha=%.3f deg", d, phi * (180.0f / M_PI), knee * (180.0f / M_PI), alpha * (180.0f / M_PI));
 
 

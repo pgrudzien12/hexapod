@@ -97,6 +97,9 @@ void app_main(void)
         // Allow tibia to move negative down to -90 deg, with max at +16 deg (both in radians)
         .min_rad_tibia = deg_to_rad(-90.0f),
         .max_rad_tibia = deg_to_rad(16.0f),
+    // Servo calibration offsets (radians)
+    .femur_offset_rad = 0.40006799f,
+    .tibia_offset_rad = 1.0160719600939494f,
     };
 
 
@@ -160,7 +163,7 @@ void app_main(void)
         vTaskDelay(pdMS_TO_TICKS(1000));
         circle_xz(leg, 200.0f, 0.0f, 50.0f, 30.0f, 80, 25);
         vTaskDelay(pdMS_TO_TICKS(1000));
-        circle_yz(leg, 170.0f, 0.0f, 50.0f, 30.0f, 80, 25);
+        circle_yz(leg, 230.0f, -30.0f, 50.0f, 30.0f, 80, 25);
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 

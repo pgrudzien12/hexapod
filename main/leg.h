@@ -38,6 +38,10 @@ typedef struct {
 	float max_rad_femur;
 	float min_rad_tibia;
 	float max_rad_tibia;
+	// Optional per-joint servo offsets in radians (added to computed geometry before clamping)
+	// Use these to calibrate neutral/zero positions. Defaults to 0 if not set.
+	float femur_offset_rad; // shoulder offset
+	float tibia_offset_rad; // knee offset
 } leg_config_t;
 
 // Create/configure a leg and return a descriptor via out_leg
