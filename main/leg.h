@@ -30,6 +30,14 @@ typedef struct {
 	float len_femur;
 	float len_tibia;
 	int group_id; // MCPWM group to use (default 0)
+	// Optional joint angle limits in radians (servo space). If both min and max are 0,
+	// defaults to [-pi/2, +pi/2] for that joint.
+	float min_rad_coxa;
+	float max_rad_coxa;
+	float min_rad_femur;
+	float max_rad_femur;
+	float min_rad_tibia;
+	float max_rad_tibia;
 } leg_config_t;
 
 // Create/configure a leg and return a descriptor via out_leg
@@ -41,6 +49,16 @@ esp_err_t leg_test_neutral(leg_handle_t leg);
 // Set angle for a specific joint in radians (clamped to supported range).
 // Returns ESP_ERR_INVALID_STATE if leg is not configured yet.
 esp_err_t leg_set_angle_rad(leg_handle_t leg, leg_servo_t joint, float radians);
+
+// Inverse kinematics entry: set a foot target in leg-local coordinates.
+// Coordinate frame:
+//  - XY plane is the ground plane
+//  - Z axis points downward (increases toward ground)
+//  - X points outward from the robot body (to the side)
+//  - Y points forward
+// Units for x/y/z should match the leg lengths provided in leg_config_t.
+// This computes joint angles and commands servos. Returns ESP_OK on success.
+esp_err_t leg_move_xyz(leg_handle_t leg, float x, float y, float z);
 
 #ifdef __cplusplus
 }

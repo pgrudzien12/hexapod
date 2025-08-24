@@ -3,10 +3,23 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <math.h>
 #include "sdkconfig.h"
 #include "driver/mcpwm_prelude.h"
 #include "esp_log.h"
 #include "esp_check.h"
+
+// Helper: clamp
+static inline float clampf(float v, float lo, float hi) {
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
+static inline float normalize_angle(float angle)
+{
+    while (angle > M_PI) angle -= 2.0f * M_PI;
+    while (angle < -M_PI) angle += 2.0f * M_PI;
+    return angle;
+}
 
 // Servo timing constants
 #define SERVO_MIN_PULSEWIDTH_US 500
@@ -33,6 +46,10 @@ typedef struct leg_s {
     int group_id;
     // segment lengths for IK (units: user-defined, e.g., mm)
     float len_coxa, len_femur, len_tibia;
+    // per-joint limits in radians
+    float min_rad_coxa, max_rad_coxa;
+    float min_rad_femur, max_rad_femur;
+    float min_rad_tibia, max_rad_tibia;
 } leg_ctx_t;
 
 static inline uint32_t angle_to_compare_rad(float radians)
@@ -61,9 +78,21 @@ esp_err_t leg_configure(const leg_config_t* cfg, leg_handle_t* out_leg)
     leg->len_coxa = cfg->len_coxa;
     leg->len_femur = cfg->len_femur;
     leg->len_tibia = cfg->len_tibia;
+    ESP_LOGD(TAG, "Leg lengths (mm): coxa=%.1f, femur=%.1f, tibia=%.1f", leg->len_coxa, leg->len_femur, leg->len_tibia);
 
-    ESP_LOGI(TAG, "Configuring leg servos on GPIOs %d, %d, %d", leg->gpio1, leg->gpio2, leg->gpio3);
+    // Set angle limits in radians (defaults to [-pi/2, +pi/2] if unset by providing 0/0)
+    leg->min_rad_coxa  = cfg->min_rad_coxa  == 0.0f ? SERVO_MIN_RAD : cfg->min_rad_coxa;
+    leg->max_rad_coxa  = cfg->max_rad_coxa  == 0.0f ? SERVO_MAX_RAD : cfg->max_rad_coxa;
+    leg->min_rad_femur = cfg->min_rad_femur == 0.0f ? SERVO_MIN_RAD : cfg->min_rad_femur;
+    leg->max_rad_femur = cfg->max_rad_femur == 0.0f ? SERVO_MAX_RAD : cfg->max_rad_femur;
+    leg->min_rad_tibia = cfg->min_rad_tibia == 0.0f ? SERVO_MIN_RAD : cfg->min_rad_tibia;
+    leg->max_rad_tibia = cfg->max_rad_tibia == 0.0f ? SERVO_MAX_RAD : cfg->max_rad_tibia;
+    // Ensure min <= max
+    if (leg->min_rad_coxa > leg->max_rad_coxa) { float t = leg->min_rad_coxa; leg->min_rad_coxa = leg->max_rad_coxa; leg->max_rad_coxa = t; }
+    if (leg->min_rad_femur > leg->max_rad_femur) { float t = leg->min_rad_femur; leg->min_rad_femur = leg->max_rad_femur; leg->max_rad_femur = t; }
+    if (leg->min_rad_tibia > leg->max_rad_tibia) { float t = leg->min_rad_tibia; leg->min_rad_tibia = leg->max_rad_tibia; leg->max_rad_tibia = t; }
 
+    // Configure and start the MCPWM timer
     mcpwm_timer_config_t timer_config = {
         .group_id = leg->group_id,
         .clk_src = MCPWM_TIMER_CLK_SRC_DEFAULT,
@@ -99,11 +128,13 @@ esp_err_t leg_configure(const leg_config_t* cfg, leg_handle_t* out_leg)
     if ((err = mcpwm_new_generator(leg->oper2, &g2, &leg->gen2)) != ESP_OK) { free(leg); return err; }
     if ((err = mcpwm_new_generator(leg->oper3, &g3, &leg->gen3)) != ESP_OK) { free(leg); return err; }
 
-    // Set neutral compare for all (0 radians)
-    uint32_t neutral = angle_to_compare_rad(0.0f);
-    if ((err = mcpwm_comparator_set_compare_value(leg->cmpr1, neutral)) != ESP_OK) { free(leg); return err; }
-    if ((err = mcpwm_comparator_set_compare_value(leg->cmpr2, neutral)) != ESP_OK) { free(leg); return err; }
-    if ((err = mcpwm_comparator_set_compare_value(leg->cmpr3, neutral)) != ESP_OK) { free(leg); return err; }
+    // Set neutral compare for all (mid-point of each joint's limits)
+    float c_mid = 0.5f * (leg->min_rad_coxa + leg->max_rad_coxa);
+    float f_mid = 0.5f * (leg->min_rad_femur + leg->max_rad_femur);
+    float t_mid = 0.5f * (leg->min_rad_tibia + leg->max_rad_tibia);
+    if ((err = mcpwm_comparator_set_compare_value(leg->cmpr1, angle_to_compare_rad(c_mid))) != ESP_OK) { free(leg); return err; }
+    if ((err = mcpwm_comparator_set_compare_value(leg->cmpr2, angle_to_compare_rad(f_mid))) != ESP_OK) { free(leg); return err; }
+    if ((err = mcpwm_comparator_set_compare_value(leg->cmpr3, angle_to_compare_rad(t_mid))) != ESP_OK) { free(leg); return err; }
 
     // Actions: go HIGH at timer empty, LOW at comparator
     if ((err = mcpwm_generator_set_action_on_timer_event(leg->gen1,
@@ -132,11 +163,13 @@ esp_err_t leg_test_neutral(leg_handle_t h)
 {
     leg_ctx_t* leg = (leg_ctx_t*)h;
     if (!leg) return ESP_ERR_INVALID_STATE;
-    uint32_t neutral = angle_to_compare_rad(0.0f);
-    ESP_LOGI(TAG, "Setting all three servos to neutral (%u us)", (unsigned)neutral);
-    ESP_RETURN_ON_ERROR(mcpwm_comparator_set_compare_value(leg->cmpr1, neutral), TAG, "cmp1 set");
-    ESP_RETURN_ON_ERROR(mcpwm_comparator_set_compare_value(leg->cmpr2, neutral), TAG, "cmp2 set");
-    ESP_RETURN_ON_ERROR(mcpwm_comparator_set_compare_value(leg->cmpr3, neutral), TAG, "cmp3 set");
+    float c_mid = 0.5f * (leg->min_rad_coxa + leg->max_rad_coxa);
+    float f_mid = 0.5f * (leg->min_rad_femur + leg->max_rad_femur);
+    float t_mid = 0.5f * (leg->min_rad_tibia + leg->max_rad_tibia);
+    ESP_LOGD(TAG, "Neutral angles (rad): coxa=%.3f femur=%.3f tibia=%.3f", c_mid, f_mid, t_mid);
+    ESP_RETURN_ON_ERROR(mcpwm_comparator_set_compare_value(leg->cmpr1, angle_to_compare_rad(c_mid)), TAG, "cmp1 set");
+    ESP_RETURN_ON_ERROR(mcpwm_comparator_set_compare_value(leg->cmpr2, angle_to_compare_rad(f_mid)), TAG, "cmp2 set");
+    ESP_RETURN_ON_ERROR(mcpwm_comparator_set_compare_value(leg->cmpr3, angle_to_compare_rad(t_mid)), TAG, "cmp3 set");
     return ESP_OK;
 }
 
@@ -144,6 +177,13 @@ esp_err_t leg_set_angle_rad(leg_handle_t h, leg_servo_t joint, float radians)
 {
     leg_ctx_t* leg = (leg_ctx_t*)h;
     if (!leg) return ESP_ERR_INVALID_STATE;
+    // Clamp per joint
+    switch (joint) {
+    case LEG_SERVO_COXA:  radians = clampf(radians, leg->min_rad_coxa,  leg->max_rad_coxa);  break;
+    case LEG_SERVO_FEMUR: radians = clampf(radians, leg->min_rad_femur, leg->max_rad_femur); break;
+    case LEG_SERVO_TIBIA: radians = clampf(radians, leg->min_rad_tibia, leg->max_rad_tibia); break;
+        default: return ESP_ERR_INVALID_ARG;
+    }
     uint32_t cmp = angle_to_compare_rad(radians);
     switch (joint) {
         case LEG_SERVO_COXA:
@@ -155,4 +195,53 @@ esp_err_t leg_set_angle_rad(leg_handle_t h, leg_servo_t joint, float radians)
         default:
             return ESP_ERR_INVALID_ARG;
     }
+}
+
+esp_err_t leg_move_xyz(leg_handle_t handle, float x, float y, float z)
+{
+    leg_ctx_t* leg = (leg_ctx_t*)handle;
+    if (!leg) return ESP_ERR_INVALID_STATE;
+
+    // Coxa rotation (yaw) in XY plane.
+    float yaw = normalize_angle(atan2f(y, x)); // range [-pi, pi]
+    float r_xy = sqrtf(x*x + y*y);
+    ESP_LOGD(TAG, "IK: r_xy=%.1f, yaw=%.3f deg", r_xy, yaw * (180.0f / M_PI));  
+    yaw = clampf(yaw, SERVO_MIN_RAD, SERVO_MAX_RAD);
+
+    float px = r_xy - leg->len_coxa;
+    float pz = z;
+
+    ESP_LOGD(TAG, "IK: px=%.1f pz=%.1f", px, pz);
+
+    // calculate cos alpha from law of cosinus
+    float L1 = leg->len_femur;
+    float L2 = leg->len_tibia;
+    float d = clampf(hypotf(px, pz), fabsf(L1 - L2), L1 + L2);
+
+    float cosK = (L2*L2 + L1*L1 - d*d) / (2*L2*L1);
+    float ankle_angle = acosf(cosK);
+    ESP_LOGD(TAG, "IK: d=%.1f, cosK=%.3f, ankle=%.3f deg", d, cosK, ankle_angle * (180.0f / M_PI));
+    float ankle_offset = 1.0160719600939494f;
+    float ankle = -(ankle_angle - ankle_offset);
+    ESP_LOGD(TAG, "IK: d=%.1f, ankle=%.3f deg", d, ankle * (180.0f / M_PI));
+
+    float cosPhi = (L1*L1 + d*d - L2*L2) / (2*L1*d);
+    float phi = acosf(cosPhi);
+    float knee_offset = 0.40006799f;
+    float alpha = M_PI / 2 - atan2f(d, pz);
+    float knee = phi - knee_offset - alpha;
+    ESP_LOGD(TAG, "IK: d=%.1f, phi=%.3f deg, knee=%.3f deg, alpha=%.3f deg", d, phi * (180.0f / M_PI), knee * (180.0f / M_PI), alpha * (180.0f / M_PI));
+
+
+    // Map to servo joints with per-joint clamping
+    yaw = clampf(yaw, leg->min_rad_coxa, leg->max_rad_coxa);
+    knee = clampf(knee, leg->min_rad_femur, leg->max_rad_femur);
+    ankle = clampf(ankle, leg->min_rad_tibia, leg->max_rad_tibia);
+
+    // Command servos
+    esp_err_t err = ESP_OK;
+    if ((err = leg_set_angle_rad(leg, LEG_SERVO_COXA, yaw)) != ESP_OK) return err;
+    if ((err = leg_set_angle_rad(leg, LEG_SERVO_FEMUR, knee)) != ESP_OK) return err;
+    if ((err = leg_set_angle_rad(leg, LEG_SERVO_TIBIA, ankle)) != ESP_OK) return err;
+    return ESP_OK;
 }
