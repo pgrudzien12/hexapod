@@ -98,7 +98,8 @@ void app_main(void)
         .min_rad_tibia = deg_to_rad(-90.0f),
         .max_rad_tibia = deg_to_rad(16.0f),
     // Servo calibration offsets (radians)
-    .femur_offset_rad = 0.40006799f,
+    .coxa_offset_rad = 4*-0.017453292519943295f,
+    .femur_offset_rad = 0.5396943301595464f,
     .tibia_offset_rad = 1.0160719600939494f,
     };
 
@@ -117,12 +118,13 @@ void app_main(void)
     const float Z_FIXED = 0.0f;
     // ESP_LOGI(TAG, "Move XYZ -> x=%.1f y=%.1f z=%.1f", 450.0f, Y_FIXED, Z_FIXED);
     // ESP_ERROR_CHECK(leg_move_xyz(leg, 450.0f, Y_FIXED, Z_FIXED));
-    vTaskDelay(pdMS_TO_TICKS(1500));
-    ESP_LOGI(TAG, "Set to zero angles");
-    ESP_ERROR_CHECK(leg_set_angle_rad(leg, LEG_SERVO_COXA, deg_to_rad(0.0f)));
-    ESP_ERROR_CHECK(leg_set_angle_rad(leg, LEG_SERVO_FEMUR, deg_to_rad(-0.0f)));
-    ESP_ERROR_CHECK(leg_set_angle_rad(leg, LEG_SERVO_TIBIA, deg_to_rad(-0.0f)));
+    // vTaskDelay(pdMS_TO_TICKS(1500));
+    // ESP_LOGI(TAG, "Set to zero angles");
+    // ESP_ERROR_CHECK(leg_set_angle_rad(leg, LEG_SERVO_COXA, deg_to_rad(0.0f)));
+    // ESP_ERROR_CHECK(leg_set_angle_rad(leg, LEG_SERVO_FEMUR, deg_to_rad(-0.0f)));
+    // ESP_ERROR_CHECK(leg_set_angle_rad(leg, LEG_SERVO_TIBIA, deg_to_rad(-0.0f)));
 
+    move_leg(leg, 200.0f, Y_FIXED, Z_FIXED, 1);
 
     // ESP_LOGI(TAG, "Test X axis");
     // move_leg(leg, 200.0f, Y_FIXED, Z_FIXED, 1);
