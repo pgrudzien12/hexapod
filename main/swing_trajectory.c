@@ -2,6 +2,7 @@
 #include "gait_scheduler.h"
 #include <math.h>
 #include <stdbool.h>
+#include <assert.h>
 
 void swing_trajectory_init(swing_trajectory_t *trajectory, float step_length, float clearance_height) {
     trajectory->step_length = step_length;
@@ -26,25 +27,21 @@ static float fracf(float x) {
 }
 
 void swing_trajectory_generate(swing_trajectory_t *trajectory, const gait_scheduler_t *scheduler, const user_command_t *cmd) {
-    if (!trajectory) {
-        return;
-    }
+    assert(trajectory != NULL);
+    assert(scheduler != NULL);
+    assert(cmd != NULL);
     // Normalize vx to [-1,1] (controller provides -1..1, but clamp for safety)
-    // TODO: Add deadband/expo if sticks are noisy
-    float vx_n = 0.0f;
-    if (cmd) {
-        vx_n = clampf(cmd->vx, -1.0f, 1.0f);
-    }
+    float vx_n = clampf(cmd->vx, -1.0f, 1.0f);
     // scale step length by speed magnitude and user step_scale; zero when disabled
     float speed_mag = fabsf(vx_n);
-    float scale = (cmd ? clampf(cmd->step_scale, 0.0f, 1.0f) : 0.5f);
-    bool enabled = (cmd && cmd->enable);
+    float scale = clampf(cmd->step_scale, 0.0f, 1.0f);
+    bool enabled = cmd->enable;
     if (!enabled) speed_mag = 0.0f;
     float L = trajectory->step_length * scale * speed_mag; // effective step length (meters)
-    float clr = trajectory->clearance_height * (cmd && cmd->terrain_climb ? 1.5f : 1.0f);
+    float clr = trajectory->clearance_height * (cmd->terrain_climb ? 1.5f : 1.0f);
     // Map normalized pose to meters
-    float body_z = cmd ? clampf(cmd->z_target, -1.0f, 1.0f) * trajectory->z_range_m : 0.0f; // meters
-    float body_y = cmd ? clampf(cmd->y_offset, -1.0f, 1.0f) * trajectory->y_range_m : 0.0f; // meters
+    float body_z = clampf(cmd->z_target, -1.0f, 1.0f) * trajectory->z_range_m; // meters
+    float body_y = clampf(cmd->y_offset, -1.0f, 1.0f) * trajectory->y_range_m; // meters
 
     // Determine swing fraction S per gait
     float S = 0.5f; // default tripod
@@ -58,12 +55,12 @@ void swing_trajectory_generate(swing_trajectory_t *trajectory, const gait_schedu
         }
     }
 
-    float phase = scheduler ? scheduler->phase : 0.0f;
+    float phase = scheduler->phase;
 
     for (int i = 0; i < NUM_LEGS; ++i) {
         foot_position_t *p = &trajectory->desired_positions[i];
         float p_i;
-        if (cmd && cmd->gait == GAIT_TRIPOD) {
+        if (cmd->gait == GAIT_TRIPOD) {
             bool inA = (i == 0 || i == 3 || i == 4);
             float offset = inA ? 0.0f : 0.5f;
             p_i = fracf(phase + offset);
@@ -72,14 +69,14 @@ void swing_trajectory_generate(swing_trajectory_t *trajectory, const gait_schedu
             p_i = fracf(phase + (i / (float)NUM_LEGS));
         }
 
-    bool swing = enabled && (p_i < S);
+        bool swing = enabled && (p_i < S);
         float tau = swing ? (p_i / S) : ((S < 1.0f) ? ((p_i - S) / (1.0f - S)) : 0.0f);
         tau = clampf(tau, 0.0f, 1.0f);
 
         // Cycloid-like arc for swing; flat for support
         float x_rel;
         float z_rel;
-    if (swing) {
+        if (swing) {
             // forward from -L/2 to +L/2 with vertical arc
             x_rel = (-0.5f + tau) * L * (vx_n >= 0.0f ? 1.0f : -1.0f);
             // smooth arch peaking at mid; sin(pi*tau) shape
@@ -92,7 +89,7 @@ void swing_trajectory_generate(swing_trajectory_t *trajectory, const gait_schedu
 
         p->x = x_rel;
         p->y = body_y;
-    p->z = body_z + z_rel; // body_z baseline; negative z_rel lifts foot if +down convention upstream
-    // TODO: Add simple body roll/pitch offsets when pose_mode is active
+        p->z = body_z + z_rel; // body_z baseline; negative z_rel lifts foot if +down convention upstream
+        // TODO: Add simple body roll/pitch offsets when pose_mode is active
     }
 }
