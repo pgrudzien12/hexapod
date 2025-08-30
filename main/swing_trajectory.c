@@ -47,7 +47,7 @@ void swing_trajectory_generate(swing_trajectory_t *trajectory, const gait_schedu
     float S = 0.5f; // default tripod
     if (cmd) {
         if (cmd->gait == GAIT_RIPPLE) {
-            S = 1.0f / (float)NUM_LEGS; // ~0.1667
+            S = 1.0f / 3.0f; // three windows, two legs per window
         } else if (cmd->gait == GAIT_WAVE) {
             S = 0.6f / (float)NUM_LEGS; // ~0.1, matches scheduler placeholder
         } else {
@@ -64,8 +64,12 @@ void swing_trajectory_generate(swing_trajectory_t *trajectory, const gait_schedu
             bool inA = (i == 0 || i == 3 || i == 4);
             float offset = inA ? 0.0f : 0.5f;
             p_i = fracf(phase + offset);
+        } else if (cmd->gait == GAIT_RIPPLE) {
+            // RIPPLE: group by i%3 into three windows
+            float offset = (i % 3) / 3.0f; // 0, 1/3, 2/3
+            p_i = fracf(phase - offset);
         } else {
-            // RIPPLE/WAVE: evenly staggered
+            // WAVE: evenly staggered by leg index
             p_i = fracf(phase + (i / (float)NUM_LEGS));
         }
 

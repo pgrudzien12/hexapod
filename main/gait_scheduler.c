@@ -48,11 +48,17 @@ void gait_scheduler_update(gait_scheduler_t *scheduler, float dt, const user_com
             break;
         }
         case GAIT_RIPPLE: {
-            // simple ripple: each leg gets a 1/6th phase window to swing
+            // Ripple (redesigned): two legs swing together as pairs, staggered over 3 windows
+            // Pairs by group (i % 3):
+            //   window 0 -> legs {0,3}
+            //   window 1 -> legs {1,4}
+            //   window 2 -> legs {2,5}
+            int window = (int)(scheduler->phase * 3.0f);
+            if (window < 0) window = 0;
+            if (window > 2) window = 2;
             for (int i = 0; i < NUM_LEGS; ++i) {
-                float leg_phase = scheduler->phase + (i / (float)NUM_LEGS);
-                while (leg_phase >= 1.0f) leg_phase -= 1.0f;
-                scheduler->leg_states[i] = (leg_phase < (1.0f / NUM_LEGS)) ? LEG_SWING : LEG_SUPPORT;
+                int g = i % 3;
+                scheduler->leg_states[i] = (g == window) ? LEG_SWING : LEG_SUPPORT;
             }
             break;
         }
