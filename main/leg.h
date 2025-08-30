@@ -16,9 +16,9 @@ extern "C" {
 //     .gpio_coxa = LEG_SERVO1_GPIO,
 //     .gpio_femur = LEG_SERVO2_GPIO,
 //     .gpio_tibia = LEG_SERVO3_GPIO,
-//     .len_coxa = 68.0f,
-//     .len_femur = 88.0f,
-//     .len_tibia = 127.0f,
+//     .len_coxa = 0.068f,
+//     .len_femur = 0.088f,
+//     .len_tibia = 0.1270f,
 //     .group_id = 0,
 //     // Allow tibia to move negative down to -90 deg, with max at +16 deg (both in radians)
 //     .min_rad_tibia = deg_to_rad(-90.0f),

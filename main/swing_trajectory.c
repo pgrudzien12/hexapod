@@ -9,7 +9,8 @@ void swing_trajectory_init(swing_trajectory_t *trajectory, float step_length, fl
     trajectory->clearance_height = clearance_height;
     // TODO: Make these configurable via Kconfig or runtime config
     trajectory->y_range_m = 0.05f; // +/-5 cm lateral
-    trajectory->z_range_m = 0.05f; // +/-5 cm vertical
+    trajectory->z_min_m = 0.05f;   // 5 cm min body height (avoid hitting battery)
+    trajectory->z_max_m = 0.10f;   // 10 cm max body height
     for (int i = 0; i < NUM_LEGS; ++i) {
         trajectory->desired_positions[i].x = 0.0f;
         trajectory->desired_positions[i].y = 0.0f;
@@ -40,26 +41,26 @@ void swing_trajectory_generate(swing_trajectory_t *trajectory, const gait_schedu
     float L = trajectory->step_length * scale * speed_mag; // effective step length (meters)
     float clr = trajectory->clearance_height * (cmd->terrain_climb ? 1.5f : 1.0f);
     // Map normalized pose to meters
-    float body_z = clampf(cmd->z_target, -1.0f, 1.0f) * trajectory->z_range_m; // meters
+    // New: map z_target in [-1,1] to [z_min_m, z_max_m] to enforce safe body height
+    // TODO: Confirm axis convention (+Z down vs up) and adjust sign if needed
+    float z_n = clampf(cmd->z_target, -1.0f, 1.0f);
+    float body_z = trajectory->z_min_m + (0.5f * (z_n + 1.0f)) * (trajectory->z_max_m - trajectory->z_min_m);
     float body_y = clampf(cmd->y_offset, -1.0f, 1.0f) * trajectory->y_range_m; // meters
 
-    // Determine swing fraction S per gait
-    float S = 0.5f; // default tripod
-    if (cmd) {
-        if (cmd->gait == GAIT_RIPPLE) {
-            S = 1.0f / 3.0f; // three windows, two legs per window
-        } else if (cmd->gait == GAIT_WAVE) {
-            S = 0.6f / (float)NUM_LEGS; // ~0.1, matches scheduler placeholder
-        } else {
-            S = 0.5f;
-        }
+    // Determine swing fraction S per gait (0 < S < 1)
+    float S;
+    switch (cmd->gait) {
+        case GAIT_RIPPLE: S = 1.0f / 3.0f; break;                   // two legs swing per 3 windows
+        case GAIT_WAVE:   S = 0.6f / (float)NUM_LEGS; break;         // ~0.1
+        case GAIT_TRIPOD: default: S = 0.5f; break;                  // balanced
     }
+    assert(S > 0.0f && S < 1.0f);
 
     float phase = scheduler->phase;
 
     for (int i = 0; i < NUM_LEGS; ++i) {
         foot_position_t *p = &trajectory->desired_positions[i];
-        float p_i;
+        float p_i; // local phase of the individual leg
         if (cmd->gait == GAIT_TRIPOD) {
             bool inA = (i == 0 || i == 3 || i == 4);
             float offset = inA ? 0.0f : 0.5f;
@@ -74,7 +75,8 @@ void swing_trajectory_generate(swing_trajectory_t *trajectory, const gait_schedu
         }
 
         bool swing = enabled && (p_i < S);
-        float tau = swing ? (p_i / S) : ((S < 1.0f) ? ((p_i - S) / (1.0f - S)) : 0.0f);
+        // tau progresses 0..1 within the active subphase (swing or support)
+        float tau = swing ? (p_i / S) : ((p_i - S) / (1.0f - S));
         tau = clampf(tau, 0.0f, 1.0f);
 
         // Cycloid-like arc for swing; flat for support

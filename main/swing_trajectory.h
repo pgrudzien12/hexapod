@@ -18,7 +18,10 @@ typedef struct {
     // TODO: Consider exposing these via config or a calibration struct
     //       so they can be tuned without recompiling.
     float y_range_m;   // maps y_offset: -1..+1 -> +/- y_range_m
-    float z_range_m;   // maps z_target: -1..+1 -> +/- z_range_m
+    // Absolute body height limits (meters) for safe mapping of z_target
+    // If +Z is down, both should be positive; z_min_m is the closest-to-body value.
+    float z_min_m;     // minimum allowed body Z (e.g., 0.05 m)
+    float z_max_m;     // maximum allowed body Z (e.g., 0.10 m)
 } swing_trajectory_t;
 
 void swing_trajectory_init(swing_trajectory_t *trajectory, float step_length, float clearance_height);
