@@ -10,13 +10,13 @@ typedef enum {
 } gait_type_t;
 
 typedef struct {
-    // desired body velocity in robot frame (m/s, rad/s)
-    // motion
-    float vx;       // forward m/s (from CH2 Left Vert)
-    float wz;       // yaw rate rad/s (from CH4 Left Horiz)
-    // body pose targets
-    float z_target; // meters (from CH3 Right Vert)
-    float y_offset; // meters lateral shift (from CH1 Right Horiz)
+    // Command inputs (normalized from controller_decode unless otherwise noted)
+    // motion (normalized -1..+1)
+    float vx;       // forward command (from CH2 Left Vert), normalized -1..+1
+    float wz;       // yaw command (from CH4 Left Horiz), normalized -1..+1
+    // body pose targets (normalized -1..+1); scale to meters in trajectory/WBC layer
+    float z_target; // normalized body height target (from CH3 Right Vert)
+    float y_offset; // normalized lateral shift (from CH1 Right Horiz)
     // mode controls
     gait_type_t gait;
     bool enable;
