@@ -10,7 +10,7 @@ void swing_trajectory_init(swing_trajectory_t *trajectory, float step_length, fl
     // TODO: Make these configurable via Kconfig or runtime config
     trajectory->y_range_m = 0.05f; // +/-5 cm lateral
     trajectory->z_min_m = 0.05f;   // 5 cm min body height (avoid hitting battery)
-    trajectory->z_max_m = 0.20f;   // 20 cm max body height
+    trajectory->z_max_m = 0.15f;   // 15 cm max body height
     for (int i = 0; i < NUM_LEGS; ++i) {
         trajectory->desired_positions[i].x = 0.0f;
         trajectory->desired_positions[i].y = 0.0f;
