@@ -11,6 +11,32 @@
 extern "C" {
 #endif
 
+// Example usage
+// leg_config_t cfg = {
+//     .gpio_coxa = LEG_SERVO1_GPIO,
+//     .gpio_femur = LEG_SERVO2_GPIO,
+//     .gpio_tibia = LEG_SERVO3_GPIO,
+//     .len_coxa = 68.0f,
+//     .len_femur = 88.0f,
+//     .len_tibia = 127.0f,
+//     .group_id = 0,
+//     // Allow tibia to move negative down to -90 deg, with max at +16 deg (both in radians)
+//     .min_rad_tibia = deg_to_rad(-90.0f),
+//     .max_rad_tibia = deg_to_rad(16.0f),
+// // Servo calibration offsets (radians)
+// .coxa_offset_rad = 4*-0.017453292519943295f,
+// .femur_offset_rad = 0.5396943301595464f,
+// .tibia_offset_rad = 1.0160719600939494f,
+// };
+
+
+// leg_handle_t leg = NULL;
+// ESP_ERROR_CHECK(leg_configure(&cfg, &leg));
+
+// ESP_LOGI(TAG, "Leg configured on GPIOs %d (coxa), %d (femur), %d (tibia)", LEG_SERVO1_GPIO, LEG_SERVO2_GPIO, LEG_SERVO3_GPIO);
+// vTaskDelay(pdMS_TO_TICKS(1500));
+
+// ESP_ERROR_CHECK(leg_test_neutral(leg));
 // Servos indices for a single 3-DOF leg
 typedef enum {
 	LEG_SERVO_COXA = 0,

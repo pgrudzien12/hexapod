@@ -9,6 +9,12 @@
 #include "esp_log.h"
 #include "esp_check.h"
 
+// Gait framework includes
+#include "gait_scheduler.h"
+#include "swing_trajectory.h"
+#include "whole_body_control.h"
+#include "robot_control.h"
+
 // Helper: clamp
 static inline float clampf(float v, float lo, float hi) {
     return v < lo ? lo : (v > hi ? hi : v);
@@ -257,3 +263,5 @@ esp_err_t leg_move_xyz(leg_handle_t handle, float x, float y, float z)
     if ((err = leg_set_angle_rad(leg, LEG_SERVO_TIBIA, ankle)) != ESP_OK) return err;
     return ESP_OK;
 }
+
+// (Removed app_main from leg.c; see main.c for main loop)

@@ -10,6 +10,12 @@
 #include "driver/mcpwm_prelude.h"
 #include "leg.h"
 #include <math.h>
+#include "gait_scheduler.h"
+#include "swing_trajectory.h"
+#include "whole_body_control.h"
+#include "robot_control.h"
+#include "user_command.h"
+#include "controller.h"
 
 static const char *TAG = "leg";
 
@@ -83,6 +89,46 @@ void circle_yz(leg_handle_t leg,
         move_leg(leg, x_fixed, y, z, delay_ms);
     }
 }
+
+// --- Gait Framework Main Loop ---
+void app_main(void)
+{
+    gait_scheduler_t scheduler;
+    swing_trajectory_t trajectory;
+    whole_body_cmd_t cmds;
+    user_command_t ucmd;
+
+    // Initialize modules with example parameters
+    gait_scheduler_init(&scheduler, 1.0f); // 1 second cycle time
+    swing_trajectory_init(&trajectory, 0.05f, 0.03f); // 5cm step, 3cm clearance
+    user_command_init();
+
+    const float dt = 0.02f; // 20ms loop
+
+    while (1) {
+        // Read user command (placeholder)
+        user_command_poll(&ucmd);
+
+    // Update gait scheduler (leg phases)
+    gait_scheduler_update(&scheduler, dt, &ucmd);
+
+    // Generate swing trajectories for legs using scheduler + command
+    swing_trajectory_generate(&trajectory, &scheduler, &ucmd);
+
+        // Compute joint commands from trajectories
+        whole_body_control_compute(&trajectory, &cmds);
+
+        // Send commands to robot
+        robot_execute(&cmds);
+
+        // Wait for next loop (replace with ESP-IDF delay)
+    vTaskDelay((int)(dt * 1000) / portTICK_PERIOD_MS);
+    // loop timing governed by vTaskDelay; phase advanced via dt
+    }
+}
+
+/*/
+// --- Previous app_main for single leg test ---
 void app_main(void)
 {
 // Configure leg on pins 13, 12, 14 with placeholder lengths (e.g., mm)
@@ -102,7 +148,6 @@ void app_main(void)
     .femur_offset_rad = 0.5396943301595464f,
     .tibia_offset_rad = 1.0160719600939494f,
     };
-
 
     leg_handle_t leg = NULL;
     ESP_ERROR_CHECK(leg_configure(&cfg, &leg));
@@ -124,7 +169,7 @@ void app_main(void)
     // ESP_ERROR_CHECK(leg_set_angle_rad(leg, LEG_SERVO_FEMUR, deg_to_rad(-0.0f)));
     // ESP_ERROR_CHECK(leg_set_angle_rad(leg, LEG_SERVO_TIBIA, deg_to_rad(-0.0f)));
 
-    move_leg(leg, 200.0f, Y_FIXED, Z_FIXED, 1);
+    // move_leg(leg, 200.0f, Y_FIXED, Z_FIXED, 1);
 
     // ESP_LOGI(TAG, "Test X axis");
     // move_leg(leg, 200.0f, Y_FIXED, Z_FIXED, 1);
@@ -161,12 +206,13 @@ void app_main(void)
         //     vTaskDelay(pdMS_TO_TICKS(500));
         // }
         
-        circle_xy(leg, 200.0f, 0.0f, 50.0f, 30.0f, 80, 25);
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        circle_xz(leg, 200.0f, 0.0f, 50.0f, 30.0f, 80, 25);
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        circle_yz(leg, 230.0f, -30.0f, 50.0f, 30.0f, 80, 25);
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        // circle_xy(leg, 200.0f, 0.0f, 50.0f, 30.0f, 80, 25);
+        // vTaskDelay(pdMS_TO_TICKS(1000));
+        // circle_xz(leg, 200.0f, 0.0f, 50.0f, 30.0f, 80, 25);
+        // vTaskDelay(pdMS_TO_TICKS(1000));
+        // circle_yz(leg, 230.0f, -30.0f, 50.0f, 30.0f, 80, 25);
+        // vTaskDelay(pdMS_TO_TICKS(1000));
     }
 
 }
+*/
