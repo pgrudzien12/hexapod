@@ -101,6 +101,7 @@ void app_main(void)
     // Initialize modules with example parameters
     gait_scheduler_init(&scheduler, 1.0f); // 1 second cycle time
     swing_trajectory_init(&trajectory, 0.05f, 0.03f); // 5cm step, 3cm clearance
+    // TODO: Calibrate swing_trajectory y/z ranges for your robot; WBC expects meters
     user_command_init();
 
     const float dt = 0.02f; // 20ms loop
@@ -109,11 +110,11 @@ void app_main(void)
         // Read user command (placeholder)
         user_command_poll(&ucmd);
 
-    // Update gait scheduler (leg phases)
-    gait_scheduler_update(&scheduler, dt, &ucmd);
+        // Update gait scheduler (leg phases)
+        gait_scheduler_update(&scheduler, dt, &ucmd);
 
-    // Generate swing trajectories for legs using scheduler + command
-    swing_trajectory_generate(&trajectory, &scheduler, &ucmd);
+        // Generate swing trajectories for legs using scheduler + command
+        swing_trajectory_generate(&trajectory, &scheduler, &ucmd);
 
         // Compute joint commands from trajectories
         whole_body_control_compute(&trajectory, &cmds);
@@ -122,8 +123,8 @@ void app_main(void)
         robot_execute(&cmds);
 
         // Wait for next loop (replace with ESP-IDF delay)
-    vTaskDelay((int)(dt * 1000) / portTICK_PERIOD_MS);
-    // loop timing governed by vTaskDelay; phase advanced via dt
+        vTaskDelay((int)(dt * 1000) / portTICK_PERIOD_MS);
+        // loop timing governed by vTaskDelay; phase advanced via dt
     }
 }
 

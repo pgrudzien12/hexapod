@@ -8,6 +8,7 @@
 #include "driver/gpio.h"
 #include "sdkconfig.h"
 #include "controller.h"
+#include <math.h>
 
 // Runtime configuration (override via controller_init)
 static controller_config_t g_cfg = {
@@ -156,15 +157,31 @@ static float map_ibus_norm(uint16_t v)
     return f;
 }
 
+// Linear deadband with range preservation
+static float apply_deadband(float v, float d)
+{
+    float av = (v < 0.0f) ? -v : v;
+    if (av <= d) {
+        return 0.0f;
+    }
+    float s = (v < 0.0f) ? -1.0f : 1.0f;
+    float o = (av - d) / (1.0f - d);
+    return s * o;
+}
+
 void controller_decode(const uint16_t ch[CONTROLLER_MAX_CHANNELS], controller_state_t *out)
 {
     if (!ch || !out) {
         return;
     }
-    out->right_horiz = map_ibus_norm(ch[0]); // CH1: Right Horiz -> lateral shift
-    out->left_vert   = map_ibus_norm(ch[1]); // CH2: Left Vert -> forward speed
-    out->right_vert  = map_ibus_norm(ch[2]); // CH3: Right Vert -> z_target
-    out->left_horiz  = map_ibus_norm(ch[3]); // CH4: Left Horiz -> yaw rate
+    // Apply small deadband to sticks to reject noise near center
+    // TODO: Make DEAD_BAND configurable via Kconfig or runtime configuration
+    const float DEAD_BAND = 0.07f; // ~7%
+
+    out->right_horiz = apply_deadband(map_ibus_norm(ch[0]), DEAD_BAND); // CH1: Right Horiz -> lateral shift
+    out->left_vert   = apply_deadband(map_ibus_norm(ch[1]), DEAD_BAND); // CH2: Left Vert -> forward speed
+    out->right_vert  = apply_deadband(map_ibus_norm(ch[2]), DEAD_BAND); // CH3: Right Vert -> z_target
+    out->left_horiz  = apply_deadband(map_ibus_norm(ch[3]), DEAD_BAND); // CH4: Left Horiz -> yaw rate
     out->swa_arm  = ch[4] > 1500;            // CH5: SWA
     out->swb_pose = ch[6] > 1500;            // CH7: SWB
     // CH8 three-position to gait
