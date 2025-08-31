@@ -101,6 +101,7 @@ void app_main(void)
     // Initialize modules with example parameters
     gait_scheduler_init(&scheduler, 1.0f); // 1 second cycle time
     swing_trajectory_init(&trajectory, 0.05f, 0.03f); // 5cm step, 3cm clearance
+    robot_config_init_default();
     // TODO: Calibrate swing_trajectory y/z ranges for your robot; WBC expects meters
     user_command_init();
 

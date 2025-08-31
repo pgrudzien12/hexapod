@@ -8,7 +8,9 @@
 
 // Joint angles for one leg
 typedef struct {
-    float joint_angles[3]; // Assume 3 DOF per leg
+    // Temporarily repurposed to carry leg-local Cartesian foot targets (x,y,z)
+    // TODO: Rename this structure or add a separate field for Cartesian targets.
+    float joint_angles[3]; // [0]=x_leg, [1]=y_leg, [2]=z_leg
 } leg_joint_cmd_t;
 
 typedef struct {

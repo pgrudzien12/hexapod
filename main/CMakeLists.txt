@@ -6,6 +6,7 @@ idf_component_register(
     "swing_trajectory.c"
     "whole_body_control.c"
     "robot_control.c"
+    "robot_config.c"
     "user_command.c"
     "controller.c"
     INCLUDE_DIRS "."

@@ -1,6 +1,7 @@
 /*
- * Hexapod leg control (3-DOF) - minimal API
- * Configures three MCPWM-driven hobby servos and provides a test to set them to neutral.
+ * Hexapod leg inverse kinematics (3-DOF) - pure IK API
+ * Computes joint angles from a Cartesian foot target in the leg-local frame.
+ * Hardware/servo driving is intentionally decoupled and lives in robot_control.
  */
 
 #pragma once
@@ -37,7 +38,7 @@ extern "C" {
 // vTaskDelay(pdMS_TO_TICKS(1500));
 
 // ESP_ERROR_CHECK(leg_test_neutral(leg));
-// Servos indices for a single 3-DOF leg
+// Servos indices for a single 3-DOF leg (shared enum, also used by robot control)
 typedef enum {
 	LEG_SERVO_COXA = 0,
 	LEG_SERVO_FEMUR = 1,
@@ -47,49 +48,39 @@ typedef enum {
 // Opaque leg descriptor
 typedef struct leg_s* leg_handle_t;
 
-// Configuration for a leg: GPIOs and segment lengths (units up to you, e.g., mm)
+// Configuration for a leg's geometry (units up to you, e.g., meters or mm)
+// Note: Hardware/servo pins, limits, and offsets are handled elsewhere (robot_control).
 typedef struct {
-	int gpio_coxa;
-	int gpio_femur;
-	int gpio_tibia;
-	float len_coxa;
-	float len_femur;
-	float len_tibia;
-	int group_id; // MCPWM group to use (default 0)
-	// Optional joint angle limits in radians (servo space). If both min and max are 0,
-	// defaults to [-pi/2, +pi/2] for that joint.
-	float min_rad_coxa;
-	float max_rad_coxa;
-	float min_rad_femur;
-	float max_rad_femur;
-	float min_rad_tibia;
-	float max_rad_tibia;
-	// Optional per-joint servo offsets in radians (added to computed geometry before clamping)
-	// Use these to calibrate neutral/zero positions. Defaults to 0 if not set.
-	float coxa_offset_rad; // hip offset
-	float femur_offset_rad; // thigh offset
-	float tibia_offset_rad; // knee offset
+	float len_coxa;   // distance from hip yaw joint to femur joint along the X axis
+	float len_femur;  // thigh length
+	float len_tibia;  // shank length
 } leg_config_t;
 
 // Create/configure a leg and return a descriptor via out_leg
 esp_err_t leg_configure(const leg_config_t* cfg, leg_handle_t* out_leg);
 
-// Drive all three servos to their neutral position (1.5ms pulse, ~0 deg).
-esp_err_t leg_test_neutral(leg_handle_t leg);
+// IK output angles in radians
+typedef struct {
+	float coxa;   // hip yaw
+	float femur;  // hip pitch
+	float tibia;  // knee/ankle
+} leg_angles_t;
 
-// Set angle for a specific joint in radians (clamped to supported range).
-// Returns ESP_ERR_INVALID_STATE if leg is not configured yet.
-esp_err_t leg_set_angle_rad(leg_handle_t leg, leg_servo_t joint, float radians);
-
-// Inverse kinematics entry: set a foot target in leg-local coordinates.
+// Inverse kinematics: compute joint angles for a foot target in leg-local coordinates.
 // Coordinate frame:
 //  - XY plane is the ground plane
 //  - Z axis points downward (increases toward ground)
 //  - X points outward from the robot body (to the side)
 //  - Y points forward
 // Units for x/y/z should match the leg lengths provided in leg_config_t.
-// This computes joint angles and commands servos. Returns ESP_OK on success.
-esp_err_t leg_move_xyz(leg_handle_t leg, float x, float y, float z);
+// Returns ESP_OK on success and writes angles to out_angles (no clamping/offsets applied).
+esp_err_t leg_ik_solve(leg_handle_t leg, float x, float y, float z, leg_angles_t *out_angles);
+
+// Deprecated: kept for source-compatibility with old demos. This no longer drives servos.
+static inline esp_err_t leg_move_xyz(leg_handle_t leg, float x, float y, float z) {
+	leg_angles_t tmp;
+	return leg_ik_solve(leg, x, y, z, &tmp);
+}
 
 #ifdef __cplusplus
 }

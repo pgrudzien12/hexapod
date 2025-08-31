@@ -1,0 +1,81 @@
+#include "robot_config.h"
+#include <string.h>
+#include <math.h>
+
+// Single static instance for now. In the future, load/save to NVS.
+static robot_config_t g_cfg;
+static float g_base_x[NUM_LEGS];
+static float g_base_y[NUM_LEGS];
+static float g_base_z[NUM_LEGS];
+static float g_base_yaw[NUM_LEGS];
+
+void robot_config_init_default(void) {
+    memset(&g_cfg, 0, sizeof(g_cfg));
+
+    // Default geometry for all 6 legs.
+    // NOTE: Units must match usage across the project. Our swing_trajectory uses meters,
+    // so we set lengths in meters as placeholders.
+    // TODO(ESP-Storage): Replace with values loaded from storage per leg.
+    const leg_config_t geom = {
+        .len_coxa = 0.068f,  // 68 mm
+        .len_femur = 0.088f, // 88 mm
+        .len_tibia = 0.127f, // 127 mm
+    };
+
+    for (int i = 0; i < NUM_LEGS; ++i) {
+        (void)leg_configure(&geom, &g_cfg.legs[i]);
+        // TODO: Consider per-leg geometry differences (mirrors, tolerances) via stored config
+    }
+
+    // --- Mount poses (defaults) ---
+    // Indexing convention (example): 0..2 left front->rear, 3..5 right front->rear.
+    // Body frame: x forward (+), y left (+), z down (+).
+    // User defaults:
+    //  - Front/back legs offset in x by ±0.08 m (front +0.08, back -0.08)
+    //  - All legs offset in y by ±0.05 m (left +0.05, right -0.05)
+    //  - Mount height z ~ 0.0 m baseline (adjust if topological zero differs)
+    //  - Base yaw chosen so that neutral servo points outward:
+    //      left side: +90° (pi/2) from body forward to left (outward)
+    //      right side: -90° (-pi/2) from body forward to right (outward)
+    // NOTE: If your neutral servo mechanically points outward with zero angle, you might set these to 0/π and
+    // then account for the 90° rotation in the leg’s joint zero offset at the actuator layer. We choose +/−90° here
+    // to absorb the chassis-to-leg frame rotation so IK gets a consistent leg-local frame.
+
+    const float X_OFF_FRONT = 0.08f;
+    const float X_OFF_REAR  = -0.08f;
+    const float Y_OFF_LEFT  = 0.05f;
+    const float Y_OFF_RIGHT = -0.05f;
+    const float Z_OFF       = 0.0f;
+    const float YAW_LEFT    = (float)M_PI * 0.5f;   // +90 deg
+    const float YAW_RIGHT   = (float)-M_PI * 0.5f;  // -90 deg
+
+    // Leg 0 (left-front)
+    g_base_x[0] = X_OFF_FRONT; g_base_y[0] = Y_OFF_LEFT; g_base_z[0] = Z_OFF; g_base_yaw[0] = YAW_LEFT;
+    // Leg 1 (left-middle)
+    g_base_x[1] = 0.0f;        g_base_y[1] = Y_OFF_LEFT; g_base_z[1] = Z_OFF; g_base_yaw[1] = YAW_LEFT;
+    // Leg 2 (left-rear)
+    g_base_x[2] = X_OFF_REAR;  g_base_y[2] = Y_OFF_LEFT; g_base_z[2] = Z_OFF; g_base_yaw[2] = YAW_LEFT;
+    // Leg 3 (right-front)
+    g_base_x[3] = X_OFF_FRONT; g_base_y[3] = Y_OFF_RIGHT; g_base_z[3] = Z_OFF; g_base_yaw[3] = YAW_RIGHT;
+    // Leg 4 (right-middle)
+    g_base_x[4] = 0.0f;        g_base_y[4] = Y_OFF_RIGHT; g_base_z[4] = Z_OFF; g_base_yaw[4] = YAW_RIGHT;
+    // Leg 5 (right-rear)
+    g_base_x[5] = X_OFF_REAR;  g_base_y[5] = Y_OFF_RIGHT; g_base_z[5] = Z_OFF; g_base_yaw[5] = YAW_RIGHT;
+
+    // --- Future hardware settings (not applied here; live in robot_control) ---
+    // - Servo pins and MCPWM mapping
+    // - Per-joint limits/offsets/inversions
+    // - Mount poses (position + yaw)
+}
+
+leg_handle_t robot_config_get_leg(int leg_index) {
+    if (leg_index < 0 || leg_index >= NUM_LEGS) return NULL;
+    return g_cfg.legs[leg_index];
+}
+
+void robot_config_get_base_pose(int leg_index, float *x, float *y, float *z, float *yaw) {
+    if (x)   *x = (leg_index >= 0 && leg_index < NUM_LEGS) ? g_base_x[leg_index] : 0.0f;
+    if (y)   *y = (leg_index >= 0 && leg_index < NUM_LEGS) ? g_base_y[leg_index] : 0.0f;
+    if (z)   *z = (leg_index >= 0 && leg_index < NUM_LEGS) ? g_base_z[leg_index] : 0.0f;
+    if (yaw) *yaw = (leg_index >= 0 && leg_index < NUM_LEGS) ? g_base_yaw[leg_index] : 0.0f;
+}
