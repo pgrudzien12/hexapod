@@ -7,6 +7,7 @@
 #include "driver/uart.h"
 #include "driver/gpio.h"
 #include "sdkconfig.h"
+#include "esp_log.h"
 #include "controller.h"
 #include <math.h>
 
@@ -22,7 +23,7 @@ static controller_config_t g_cfg = {
     .task_prio = 10,
 };
 
-// no logging in this module to keep it lightweight
+static const char *TAG_CTRL = "controller";
 
 #define BUF_SIZE (64)
 
@@ -42,6 +43,20 @@ static controller_config_t g_cfg = {
 static SemaphoreHandle_t g_ch_mutex;
 static uint16_t g_channels[CONTROLLER_MAX_CHANNELS];
 static volatile uint32_t g_last_update_ms;
+static volatile TickType_t g_last_frame_tick; // last valid iBUS frame tick
+static volatile bool g_connected;             // connection state
+
+// Fill default failsafe channels
+static void controller_fill_failsafe(uint16_t out[CONTROLLER_MAX_CHANNELS])
+{
+    for (int i = 0; i < CONTROLLER_MAX_CHANNELS; ++i) out[i] = 1000; // default low
+    // Sticks neutral 1500 except CH3 Right Vert = 1000
+    out[0] = 1500; // CH1 Right Horiz
+    out[1] = 1500; // CH2 Left Vert
+    // CH3 stays 1000
+    out[3] = 1500; // CH4 Left Horiz
+    out[5] = 1500; // CH6 Right Vert (unused) neutral
+}
 
 static void controller_task(void *arg)
 {
@@ -70,24 +85,8 @@ static void controller_task(void *arg)
         // Use a small fixed timeout in ticks to avoid macro issues in static analysis
         const TickType_t timeout_ticks = 20; // ~20ms if tick=1ms
         int len = uart_read_bytes(g_cfg.uart_port, data, sizeof(data), timeout_ticks);
-        if (len < 0) {
-            // Failsafe defaults when transmitter not connected
-            uint16_t local[CONTROLLER_MAX_CHANNELS];
-            for (int i = 0; i < CONTROLLER_MAX_CHANNELS; ++i) {
-                local[i] = 1000; // switches and unused default low
-            }
-            // Sticks neutral 1500 except CH3 Right Vert = 1000
-            local[0] = 1500; // CH1 Right Horiz
-            local[1] = 1500; // CH2 Left Vert
-            // CH3 stays 1000
-            local[3] = 1500; // CH4 Left Horiz
-            local[5] = 1500; // CH6 Right Vert (unused) neutral
-            if (xSemaphoreTake(g_ch_mutex, 5) == pdTRUE) {
-                memcpy(g_channels, local, sizeof(local));
-                g_last_update_ms = (uint32_t)(xTaskGetTickCount());
-                xSemaphoreGive(g_ch_mutex);
-            }
-        } else if (len >= 32) {
+        TickType_t now_tick = xTaskGetTickCount();
+        if (len >= 32) {
             // look for IBUS frame
             if (data[0] == 0x20 && data[1] == 0x40) {
                 uint16_t local[CONTROLLER_MAX_CHANNELS];
@@ -96,13 +95,33 @@ static void controller_task(void *arg)
                 }
                 if (xSemaphoreTake(g_ch_mutex, 5) == pdTRUE) {
                     memcpy(g_channels, local, sizeof(local));
-                    g_last_update_ms = (uint32_t)(xTaskGetTickCount());
+                    g_last_update_ms = (uint32_t)now_tick;
                     xSemaphoreGive(g_ch_mutex);
-
-
+                }
+                // mark connection alive
+                g_last_frame_tick = now_tick;
+                if (!g_connected) {
+                    g_connected = true;
+                    ESP_LOGI(TAG_CTRL, "iBUS connected (UART%d RX=%d TX=%d)", (int)g_cfg.uart_port, (int)g_cfg.rx_gpio, (int)g_cfg.tx_gpio);
                 }
                 // ESP_LOGD(TAG, "CH1=%u CH2=%u CH3=%u CH4=%u CH5=%u CH6=%u CH7=%u CH8=%u CH9=%u CH10=%u CH11=%u CH12=%u CH13=%u CH14=%u",
                 //          local[0], local[1], local[2], local[3], local[4], local[5], local[6], local[7], local[8], local[9], local[10], local[11], local[12], local[13]);
+            }
+        } else if (len < 0) {
+            // Read error: keep last state, we'll rely on timeout handling below
+        }
+        // Connection timeout handling: if no valid frames for > 1s, declare disconnected and set failsafe
+        TickType_t dt = now_tick - g_last_frame_tick;
+        if (g_connected && dt > pdMS_TO_TICKS(1000)) {
+            g_connected = false;
+            uint32_t ms = (uint32_t)(dt * portTICK_PERIOD_MS);
+            ESP_LOGW(TAG_CTRL, "iBUS disconnected: no frames for %u ms, entering failsafe", (unsigned)ms);
+            uint16_t local[CONTROLLER_MAX_CHANNELS];
+            controller_fill_failsafe(local);
+            if (xSemaphoreTake(g_ch_mutex, 5) == pdTRUE) {
+                memcpy(g_channels, local, sizeof(local));
+                g_last_update_ms = (uint32_t)now_tick;
+                xSemaphoreGive(g_ch_mutex);
             }
         }
     }

@@ -14,11 +14,13 @@ static float g_base_yaw[NUM_LEGS];
 
 void robot_config_init_default(void) {
     memset(&g_cfg, 0, sizeof(g_cfg));
-    // Default: no GPIOs assigned yet; groups 0
+    // Default: no GPIOs assigned yet; distribute legs across two MCPWM groups (0 for legs 0..2, 1 for legs 3..5)
     for (int i = 0; i < NUM_LEGS; ++i) {
-        g_cfg.mcpwm_group_id[i] = 0;
+        g_cfg.mcpwm_group_id[i] = (i < 3) ? 0 : 1;
         for (int j = 0; j < 3; ++j) g_cfg.servo_gpio[i][j] = -1;
     }
+    // Rebalance within first three legs: move leg 2 to group 1 so group 0 only has two legs (6 channels)
+    g_cfg.mcpwm_group_id[2] = 1;
 
     // Temporary GPIO assignment: leg 0 only
     // Joint order: [0]=COXA (yaw), [1]=FEMUR (pitch), [2]=TIBIA (knee)
@@ -26,13 +28,14 @@ void robot_config_init_default(void) {
     g_cfg.servo_gpio[0][LEG_SERVO_FEMUR] = 12;
     g_cfg.servo_gpio[0][LEG_SERVO_TIBIA] = 14;
     
-    g_cfg.servo_gpio[1][LEG_SERVO_COXA]  = 27;
-    g_cfg.servo_gpio[1][LEG_SERVO_FEMUR] = 26;
-    g_cfg.servo_gpio[1][LEG_SERVO_TIBIA] = 25;
-    
-    g_cfg.servo_gpio[2][LEG_SERVO_COXA]  = 33;
-    g_cfg.servo_gpio[2][LEG_SERVO_FEMUR] = 32;
-    g_cfg.servo_gpio[2][LEG_SERVO_TIBIA] = 35;
+    // Keep other legs disabled for now (set to -1) until MCPWM capacity is confirmed and pins are verified
+    g_cfg.servo_gpio[1][LEG_SERVO_COXA]  = -1;
+    g_cfg.servo_gpio[1][LEG_SERVO_FEMUR] = -1;
+    g_cfg.servo_gpio[1][LEG_SERVO_TIBIA] = -1;
+
+    g_cfg.servo_gpio[2][LEG_SERVO_COXA]  = -1;
+    g_cfg.servo_gpio[2][LEG_SERVO_FEMUR] = -1;
+    g_cfg.servo_gpio[2][LEG_SERVO_TIBIA] = -1;
 
     // Default geometry for all 6 legs.
     // NOTE: Units must match usage across the project. Our swing_trajectory uses meters,
