@@ -106,6 +106,12 @@ void robot_config_init_default(void) {
     // - Servo pins and MCPWM mapping
     // - Per-joint limits/offsets/inversions
     // - Mount poses (position + yaw)
+
+    // --- Debug defaults ---
+    g_cfg.debug_leg_enable = 1;         // enable by default for bring-up
+    g_cfg.debug_leg_index = 0;          // monitor leg 0 by default
+    g_cfg.debug_leg_delta_thresh = 0.0174533f; // ~1 degree
+    g_cfg.debug_leg_min_interval_ms = 100;     // 100 ms between logs min
 }
 
 leg_handle_t robot_config_get_leg(int leg_index) {
@@ -137,4 +143,17 @@ int robot_config_get_servo_gpio(int leg_index, leg_servo_t joint) {
 int robot_config_get_mcpwm_group(int leg_index) {
     if (leg_index < 0 || leg_index >= NUM_LEGS) return 0;
     return g_cfg.mcpwm_group_id[leg_index];
+}
+
+int robot_config_debug_enabled(void) {
+    return g_cfg.debug_leg_enable;
+}
+int robot_config_debug_leg_index(void) {
+    return g_cfg.debug_leg_index;
+}
+float robot_config_debug_delta_thresh(void) {
+    return g_cfg.debug_leg_delta_thresh;
+}
+unsigned int robot_config_debug_min_interval_ms(void) {
+    return g_cfg.debug_leg_min_interval_ms;
 }

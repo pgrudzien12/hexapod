@@ -30,6 +30,12 @@ typedef struct {
     // MCPWM group per leg (for now one group id per leg; simplest is all 0)
     int mcpwm_group_id[NUM_LEGS];
 
+    // Debug/telemetry controls
+    int debug_leg_enable;          // 0/1 to enable leg debugger
+    int debug_leg_index;           // which leg to monitor
+    float debug_leg_delta_thresh;  // radians; min delta to log
+    unsigned int debug_leg_min_interval_ms; // min interval between logs
+
     // --- Planned settings to migrate to storage (comments only for now) ---
     // - Servo GPIO pins per leg/joint (coxa/femur/tibia)
     // - MCPWM group/operator/timer mapping per joint
@@ -61,5 +67,11 @@ int robot_config_get_servo_gpio(int leg_index, leg_servo_t joint);
 
 // MCPWM group id for this leg (default 0).
 int robot_config_get_mcpwm_group(int leg_index);
+
+// Debug controls getters
+int robot_config_debug_enabled(void);
+int robot_config_debug_leg_index(void);
+float robot_config_debug_delta_thresh(void);
+unsigned int robot_config_debug_min_interval_ms(void);
 
 #endif // ROBOT_CONFIG_H

@@ -17,6 +17,7 @@
 #include "robot_config.h"
 #include "user_command.h"
 #include "controller.h"
+#include "leg_debugger.h"
 
 static const char *TAG = "leg";
 
@@ -100,9 +101,16 @@ void app_main(void)
     user_command_t ucmd;
 
     // Initialize modules with example parameters
-    gait_scheduler_init(&scheduler, 1.0f); // 1 second cycle time
+    gait_scheduler_init(&scheduler, 2.0f); // 2 second cycle time
     swing_trajectory_init(&trajectory, 0.05f, 0.03f); // 5cm step, 3cm clearance
     robot_config_init_default();
+    // Debugger wiring
+    leg_debugger_init(
+        robot_config_debug_enabled(),
+        robot_config_debug_leg_index(),
+        robot_config_debug_delta_thresh(),
+        robot_config_debug_min_interval_ms()
+    );
     // TODO: Calibrate swing_trajectory y/z ranges for your robot; WBC expects meters
     user_command_init();
 
@@ -111,18 +119,29 @@ void app_main(void)
     while (1) {
         // Read user command (placeholder)
         user_command_poll(&ucmd);
+        // ESP_LOGI(TAG, "Cmd: gait=%d vx=%.2f step_scale=%.2f z_target=%.2f y_offset=%.2f terrain_climb=%d enable=%d",
+        //          ucmd.gait, ucmd.vx, ucmd.step_scale, ucmd.z_target, ucmd.y_offset, ucmd.terrain_climb, ucmd.enable);
 
         // Update gait scheduler (leg phases)
         gait_scheduler_update(&scheduler, dt, &ucmd);
+        // ESP_LOGI(TAG, "Scheduler: phase=%.3f, LEG1=%d", scheduler.phase, (int)scheduler.leg_states[0]);
 
-        // Generate swing trajectories for legs using scheduler + command
+
+        // // Generate swing trajectories for legs using scheduler + command
         swing_trajectory_generate(&trajectory, &scheduler, &ucmd);
+        ESP_LOGI(TAG, "Trajectory: LEG1 pos=(%.3f, %.3f, %.3f)",
+                 trajectory.desired_positions[0].x,
+                 trajectory.desired_positions[0].y,
+                 trajectory.desired_positions[0].z);
 
-        // Compute joint commands from trajectories
-        whole_body_control_compute(&trajectory, &cmds);
+        // // Compute joint commands from trajectories
+        // whole_body_control_compute(&trajectory, &cmds);
 
-        // Send commands to robot
-        robot_execute(&cmds);
+        // // Debug log for a single leg (angle deltas)
+        // leg_debugger_update(&cmds);
+
+        // // Send commands to robot
+        // robot_execute(&cmds);
 
         // Wait for next loop (replace with ESP-IDF delay)
         vTaskDelay((int)(dt * 1000) / portTICK_PERIOD_MS);
