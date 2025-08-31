@@ -1,6 +1,7 @@
 #include "whole_body_control.h"
 #include "leg.h"
 #include "robot_config.h"
+#include <math.h>
 #include <assert.h>
 
 // Temporary convention bridging:

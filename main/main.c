@@ -14,6 +14,7 @@
 #include "swing_trajectory.h"
 #include "whole_body_control.h"
 #include "robot_control.h"
+#include "robot_config.h"
 #include "user_command.h"
 #include "controller.h"
 

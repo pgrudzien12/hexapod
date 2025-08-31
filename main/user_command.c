@@ -1,8 +1,9 @@
 #include <stddef.h>
 #include "user_command.h"
 #include "controller.h"
+#include "esp_log.h"
 
-const char* TAG = "user_command";
+static const char* TAG = "user_command";
 
 void user_command_init(void) {
     // Start controller task with default config; user can change later

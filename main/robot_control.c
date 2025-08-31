@@ -1,8 +1,12 @@
 #include "robot_control.h"
 #include "esp_log.h"
+#include "esp_check.h"
 #include "robot_config.h"
 #include "driver/mcpwm_prelude.h"
 #include <math.h>
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 static const char *TAG_RC = "robot_control";
 
