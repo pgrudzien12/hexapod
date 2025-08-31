@@ -74,7 +74,9 @@ void swing_trajectory_generate(swing_trajectory_t *trajectory, const gait_schedu
             p_i = fracf(phase + (i / (float)NUM_LEGS));
         }
 
-        bool swing = enabled && (p_i < S);
+        // Only swing (lift foot) when there's a non-zero commanded step length
+        // This avoids up/down motion at zero speed.
+        bool swing = enabled && (L > 1e-6f) && (p_i < S);
         // tau progresses 0..1 within the active subphase (swing or support)
         float tau = swing ? (p_i / S) : ((p_i - S) / (1.0f - S));
         tau = clampf(tau, 0.0f, 1.0f);

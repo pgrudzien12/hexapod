@@ -195,7 +195,7 @@ void controller_decode(const uint16_t ch[CONTROLLER_MAX_CHANNELS], controller_st
     }
     // Apply small deadband to sticks to reject noise near center
     // TODO: Make DEAD_BAND configurable via Kconfig or runtime configuration
-    const float DEAD_BAND = 0.07f; // ~7%
+    const float DEAD_BAND = 0.04f; // ~4%
 
     out->right_horiz = apply_deadband(map_ibus_norm(ch[0]), DEAD_BAND); // CH1: Right Horiz -> lateral shift
     out->left_vert   = apply_deadband(map_ibus_norm(ch[1]), DEAD_BAND); // CH2: Left Vert -> forward speed
@@ -205,11 +205,11 @@ void controller_decode(const uint16_t ch[CONTROLLER_MAX_CHANNELS], controller_st
     out->swb_pose = ch[6] > 1500;            // CH7: SWB
     // CH8 three-position to gait
     if (ch[7] < 1300) {
-        out->swc_gait = GAIT_MODE_WAVE;
+        out->swc_gait = GAIT_MODE_TRIPOD;
     } else if (ch[7] < 1700) {
         out->swc_gait = GAIT_MODE_RIPPLE;
     } else {
-        out->swc_gait = GAIT_MODE_TRIPOD;
+        out->swc_gait = GAIT_MODE_WAVE;
     }
     out->swd_terrain = ch[8] > 1500;         // CH9: SWD
     // CH10: VRA 0..1

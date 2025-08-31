@@ -129,7 +129,9 @@ void app_main(void)
 
         // // Generate swing trajectories for legs using scheduler + command
         swing_trajectory_generate(&trajectory, &scheduler, &ucmd);
-        ESP_LOGI(TAG, "Trajectory: LEG1 pos=(%.3f, %.3f, %.3f)",
+        ESP_LOGI(TAG, "Gait=%d, vx=%.2f, Trajectory: LEG1 pos=(%.3f, %.3f, %.3f)",
+                 ucmd.gait,
+                 ucmd.vx,
                  trajectory.desired_positions[0].x,
                  trajectory.desired_positions[0].y,
                  trajectory.desired_positions[0].z);
