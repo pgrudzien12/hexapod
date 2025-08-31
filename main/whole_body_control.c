@@ -3,6 +3,7 @@
 #include "robot_config.h"
 #include <math.h>
 #include <assert.h>
+#include "esp_log.h"
 
 // Temporary convention bridging:
 // - swing_trajectory outputs body-frame positions (meters):
@@ -14,6 +15,8 @@
 //     Y_leg = X_body for all
 //     Z_leg = Z_body for all (already down-positive)
 // TODO: Replace with full per-leg transform using mount poses and yaw angles.
+
+const char *TAG = "wbc";
 
 static inline int is_right_leg(int idx) {
     return (idx >= 3); // 0,1,2 left; 3,4,5 right
@@ -37,12 +40,17 @@ void whole_body_control_compute(const swing_trajectory_t *trajectory, whole_body
         float px = x_body - bx;
         float py = y_body - by;
         float pz = z_body - bz;
+        if (i < 3)
+            ESP_LOGI(TAG, "Leg %d: Body (%.3f, %.3f, %.3f) -> Leg: (%.3f, %.3f, %.3f)", i, x_body, y_body, z_body, px, py, pz);
 
         // Rotate by -yaw to align leg frame (X_leg outward, Y_leg forward, Z_leg down)
         float c = cosf(-psi), s = sinf(-psi);
         float x_leg = c * px - s * py; // outward
         float y_leg = s * px + c * py; // forward
         float z_leg = pz;              // down (unchanged for yaw rotation)
+
+        if (i < 3)
+            ESP_LOGI(TAG, "Leg %d: Rotated Leg: (%.3f, %.3f, %.3f)", i, x_leg, y_leg, z_leg);
 
         // Look up per-leg IK geometry from robot_config.
         leg_handle_t leg = robot_config_get_leg(i);

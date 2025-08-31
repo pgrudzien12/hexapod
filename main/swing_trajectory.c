@@ -3,6 +3,7 @@
 #include <math.h>
 #include <stdbool.h>
 #include <assert.h>
+#include "robot_config.h"
 
 void swing_trajectory_init(swing_trajectory_t *trajectory, float step_length, float clearance_height) {
     trajectory->step_length = step_length;
@@ -95,9 +96,19 @@ void swing_trajectory_generate(swing_trajectory_t *trajectory, const gait_schedu
             z_rel = 0.0f;
         }
 
-        p->x = x_rel;
-        p->y = body_y;
-        p->z = body_z + z_rel; // body_z baseline; negative z_rel lifts foot if +down convention upstream
+    // Convert offsets to absolute body-frame targets by adding each leg's base pose
+    float bx, by, bz, yaw;
+    robot_config_get_base_pose(i, &bx, &by, &bz, &yaw);
+    // Apply neutral stance reach in leg-local frame (X_outward, Y_forward), rotated to body frame
+    float out_m = robot_config_get_stance_out_m(i);
+    float fwd_m = robot_config_get_stance_fwd_m(i);
+    float cy = cosf(yaw), sy = sinf(yaw);
+    float dx_stance = cy * out_m - sy * fwd_m;
+    float dy_stance = sy * out_m + cy * fwd_m;
+
+    p->x = bx + dx_stance + x_rel;
+    p->y = by + dy_stance + body_y;
+    p->z = bz + body_z + z_rel; // include base z in case it's non-zero
         // TODO: Add simple body roll/pitch offsets when pose_mode is active
     }
 }

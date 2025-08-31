@@ -129,15 +129,44 @@ void app_main(void)
 
         // // Generate swing trajectories for legs using scheduler + command
         swing_trajectory_generate(&trajectory, &scheduler, &ucmd);
-        ESP_LOGI(TAG, "Gait=%d, vx=%.2f, Trajectory: LEG1 pos=(%.3f, %.3f, %.3f)",
-                 ucmd.gait,
-                 ucmd.vx,
-                 trajectory.desired_positions[0].x,
-                 trajectory.desired_positions[0].y,
-                 trajectory.desired_positions[0].z);
+        // ESP_LOGI(TAG, "Gait=%d, vx=%.2f, Trajectory: L1=(%.3f, %.3f, %.3f) L2=(%.3f, %.3f, %.3f) L3=(%.3f, %.3f, %.3f)",
+        //          ucmd.gait,
+        //          ucmd.vx,
+        //          trajectory.desired_positions[0].x,
+        //          trajectory.desired_positions[0].y,
+        //          trajectory.desired_positions[0].z,
+        //          trajectory.desired_positions[1].x,
+        //          trajectory.desired_positions[1].y,
+        //          trajectory.desired_positions[1].z,
+        //          trajectory.desired_positions[2].x,
+        //          trajectory.desired_positions[2].y,
+        //          trajectory.desired_positions[2].z);
+
+        // ESP_LOGI(TAG, "Gait=%d, vx=%.2f, Trajectory: L4=(%.3f, %.3f, %.3f) L5=(%.3f, %.3f, %.3f) L6=(%.3f, %.3f, %.3f)",
+        //          ucmd.gait,
+        //          ucmd.vx,
+        //          trajectory.desired_positions[3].x,
+        //          trajectory.desired_positions[3].y,
+        //          trajectory.desired_positions[3].z,
+        //          trajectory.desired_positions[4].x,
+        //          trajectory.desired_positions[4].y,
+        //          trajectory.desired_positions[4].z,
+        //          trajectory.desired_positions[5].x,
+        //          trajectory.desired_positions[5].y,
+        //          trajectory.desired_positions[5].z);
 
         // // Compute joint commands from trajectories
-        // whole_body_control_compute(&trajectory, &cmds);
+        whole_body_control_compute(&trajectory, &cmds);
+        // ESP_LOGI(TAG, "Cmds: L1=(%.1f, %.1f, %.1f) L2=(%.1f, %.1f, %.1f) L3=(%.1f, %.1f, %.1f)",
+        //      ((float*)(&cmds.joint_cmds[0]))[0],
+        //      ((float*)(&cmds.joint_cmds[0]))[1],
+        //      ((float*)(&cmds.joint_cmds[0]))[2],
+        //      ((float*)(&cmds.joint_cmds[1]))[0],
+        //      ((float*)(&cmds.joint_cmds[1]))[1],
+        //      ((float*)(&cmds.joint_cmds[1]))[2],
+        //      ((float*)(&cmds.joint_cmds[2]))[0],
+        //      ((float*)(&cmds.joint_cmds[2]))[1],
+        //      ((float*)(&cmds.joint_cmds[2]))[2]);
 
         // // Debug log for a single leg (angle deltas)
         // leg_debugger_update(&cmds);

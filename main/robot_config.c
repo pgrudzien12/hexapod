@@ -11,6 +11,8 @@ static float g_base_x[NUM_LEGS];
 static float g_base_y[NUM_LEGS];
 static float g_base_z[NUM_LEGS];
 static float g_base_yaw[NUM_LEGS];
+static float g_stance_out[NUM_LEGS]; // leg-local outward (+)
+static float g_stance_fwd[NUM_LEGS]; // leg-local forward (+)
 
 void robot_config_init_default(void) {
     memset(&g_cfg, 0, sizeof(g_cfg));
@@ -88,19 +90,27 @@ void robot_config_init_default(void) {
     const float Z_OFF       = 0.0f;
     const float YAW_LEFT    = (float)M_PI * 0.5f;   // +90 deg
     const float YAW_RIGHT   = (float)-M_PI * 0.5f;  // -90 deg
+    
+    const float QANGLE = (float)M_PI * 0.25f;   // +45 deg
 
     // Leg 0 (left-front)
     g_base_x[0] = X_OFF_FRONT; g_base_y[0] = Y_OFF_LEFT; g_base_z[0] = Z_OFF; g_base_yaw[0] = YAW_LEFT;
+    g_stance_fwd[0] =  -0.10f; g_stance_out[0] = 0.15f; // 15 cm outward
     // Leg 1 (left-middle)
     g_base_x[1] = 0.0f;        g_base_y[1] = Y_OFF_LEFT; g_base_z[1] = Z_OFF; g_base_yaw[1] = YAW_LEFT;
+    g_stance_fwd[1] = 0.0f; g_stance_out[1] = 0.15f; // 15 cm outward
     // Leg 2 (left-rear)
     g_base_x[2] = X_OFF_REAR;  g_base_y[2] = Y_OFF_LEFT; g_base_z[2] = Z_OFF; g_base_yaw[2] = YAW_LEFT;
+    g_stance_fwd[2] = 0.10f; g_stance_out[2] = 0.15f; // 15 cm outward
     // Leg 3 (right-front)
     g_base_x[3] = X_OFF_FRONT; g_base_y[3] = Y_OFF_RIGHT; g_base_z[3] = Z_OFF; g_base_yaw[3] = YAW_RIGHT;
+    g_stance_fwd[3] = -0.10f; g_stance_out[3] = 0.15f; // 15 cm outward
     // Leg 4 (right-middle)
     g_base_x[4] = 0.0f;        g_base_y[4] = Y_OFF_RIGHT; g_base_z[4] = Z_OFF; g_base_yaw[4] = YAW_RIGHT;
+    g_stance_fwd[4] = 0.0f; g_stance_out[4] = 0.15f; // 15 cm outward
     // Leg 5 (right-rear)
     g_base_x[5] = X_OFF_REAR;  g_base_y[5] = Y_OFF_RIGHT; g_base_z[5] = Z_OFF; g_base_yaw[5] = YAW_RIGHT;
+    g_stance_fwd[5] = 0.10f; g_stance_out[5] = 0.15f; // 15 cm outward
 
     // --- Future hardware settings (not applied here; live in robot_control) ---
     // - Servo pins and MCPWM mapping
@@ -156,4 +166,13 @@ float robot_config_debug_delta_thresh(void) {
 }
 unsigned int robot_config_debug_min_interval_ms(void) {
     return g_cfg.debug_leg_min_interval_ms;
+}
+
+float robot_config_get_stance_out_m(int leg_index) {
+    if (leg_index < 0 || leg_index >= NUM_LEGS) return 0.0f;
+    return g_stance_out[leg_index];
+}
+float robot_config_get_stance_fwd_m(int leg_index) {
+    if (leg_index < 0 || leg_index >= NUM_LEGS) return 0.0f;
+    return g_stance_fwd[leg_index];
 }

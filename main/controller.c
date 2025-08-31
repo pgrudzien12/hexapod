@@ -142,6 +142,8 @@ void controller_init(const controller_config_t *cfg)
     if (cfg) {
         g_cfg = *cfg;
     }
+
+    controller_fill_failsafe(g_channels);
     xTaskCreate(controller_task, "controller_task", g_cfg.task_stack, NULL, g_cfg.task_prio, NULL);
 }
 

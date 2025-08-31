@@ -74,4 +74,8 @@ int robot_config_debug_leg_index(void);
 float robot_config_debug_delta_thresh(void);
 unsigned int robot_config_debug_min_interval_ms(void);
 
+// Stance getters (per leg). In leg-local axes: X_outward (+), Y_forward (+). Units: meters.
+float robot_config_get_stance_out_m(int leg_index);
+float robot_config_get_stance_fwd_m(int leg_index);
+
 #endif // ROBOT_CONFIG_H
