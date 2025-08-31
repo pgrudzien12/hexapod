@@ -1,6 +1,9 @@
 #include "robot_config.h"
 #include <string.h>
 #include <math.h>
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 // Single static instance for now. In the future, load/save to NVS.
 static robot_config_t g_cfg;
@@ -11,6 +14,25 @@ static float g_base_yaw[NUM_LEGS];
 
 void robot_config_init_default(void) {
     memset(&g_cfg, 0, sizeof(g_cfg));
+    // Default: no GPIOs assigned yet; groups 0
+    for (int i = 0; i < NUM_LEGS; ++i) {
+        g_cfg.mcpwm_group_id[i] = 0;
+        for (int j = 0; j < 3; ++j) g_cfg.servo_gpio[i][j] = -1;
+    }
+
+    // Temporary GPIO assignment: leg 0 only
+    // Joint order: [0]=COXA (yaw), [1]=FEMUR (pitch), [2]=TIBIA (knee)
+    g_cfg.servo_gpio[0][LEG_SERVO_COXA]  = 13;
+    g_cfg.servo_gpio[0][LEG_SERVO_FEMUR] = 12;
+    g_cfg.servo_gpio[0][LEG_SERVO_TIBIA] = 14;
+    
+    g_cfg.servo_gpio[1][LEG_SERVO_COXA]  = 27;
+    g_cfg.servo_gpio[1][LEG_SERVO_FEMUR] = 26;
+    g_cfg.servo_gpio[1][LEG_SERVO_TIBIA] = 25;
+    
+    g_cfg.servo_gpio[2][LEG_SERVO_COXA]  = 33;
+    g_cfg.servo_gpio[2][LEG_SERVO_FEMUR] = 32;
+    g_cfg.servo_gpio[2][LEG_SERVO_TIBIA] = 35;
 
     // Default geometry for all 6 legs.
     // NOTE: Units must match usage across the project. Our swing_trajectory uses meters,
@@ -25,6 +47,21 @@ void robot_config_init_default(void) {
     for (int i = 0; i < NUM_LEGS; ++i) {
         (void)leg_configure(&geom, &g_cfg.legs[i]);
         // TODO: Consider per-leg geometry differences (mirrors, tolerances) via stored config
+    }
+
+    // --- Joint calibration defaults ---
+    // Range: [-90°, +90°], no inversion, zero offset = 0, endpoints 500..2500us, neutral ~1500us
+    for (int i = 0; i < NUM_LEGS; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            joint_calib_t *c = &g_cfg.joint_calib[i][j];
+            c->zero_offset_rad = 0.0f;
+            c->invert_sign = 1;
+            c->min_rad = (float)-M_PI * 0.5f;
+            c->max_rad = (float) M_PI * 0.5f;
+            c->pwm_min_us = 500;
+            c->pwm_max_us = 2500;
+            c->neutral_us = 1500;
+        }
     }
 
     // --- Mount poses (defaults) ---
@@ -78,4 +115,23 @@ void robot_config_get_base_pose(int leg_index, float *x, float *y, float *z, flo
     if (y)   *y = (leg_index >= 0 && leg_index < NUM_LEGS) ? g_base_y[leg_index] : 0.0f;
     if (z)   *z = (leg_index >= 0 && leg_index < NUM_LEGS) ? g_base_z[leg_index] : 0.0f;
     if (yaw) *yaw = (leg_index >= 0 && leg_index < NUM_LEGS) ? g_base_yaw[leg_index] : 0.0f;
+}
+
+const joint_calib_t* robot_config_get_joint_calib(int leg_index, leg_servo_t joint) {
+    if (leg_index < 0 || leg_index >= NUM_LEGS) return NULL;
+    int j = (int)joint;
+    if (j < 0 || j >= 3) return NULL;
+    return &g_cfg.joint_calib[leg_index][j];
+}
+
+int robot_config_get_servo_gpio(int leg_index, leg_servo_t joint) {
+    if (leg_index < 0 || leg_index >= NUM_LEGS) return -1;
+    int j = (int)joint;
+    if (j < 0 || j >= 3) return -1;
+    return g_cfg.servo_gpio[leg_index][j];
+}
+
+int robot_config_get_mcpwm_group(int leg_index) {
+    if (leg_index < 0 || leg_index >= NUM_LEGS) return 0;
+    return g_cfg.mcpwm_group_id[leg_index];
 }
