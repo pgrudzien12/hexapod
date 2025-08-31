@@ -172,7 +172,7 @@ void app_main(void)
         // leg_debugger_update(&cmds);
 
         // // Send commands to robot
-        // robot_execute(&cmds);
+        robot_execute(&cmds);
 
         // Wait for next loop (replace with ESP-IDF delay)
         vTaskDelay((int)(dt * 1000) / portTICK_PERIOD_MS);

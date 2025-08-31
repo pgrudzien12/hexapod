@@ -47,6 +47,9 @@ void robot_config_init_default(void) {
         .len_coxa = 0.068f,  // 68 mm
         .len_femur = 0.088f, // 88 mm
         .len_tibia = 0.127f, // 127 mm
+        .coxa_offset_rad = 4*-0.017453292519943295f,
+        .femur_offset_rad = 0.5396943301595464f,
+        .tibia_offset_rad = 1.0160719600939494f,
     };
 
     for (int i = 0; i < NUM_LEGS; ++i) {

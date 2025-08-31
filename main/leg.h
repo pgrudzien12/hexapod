@@ -54,6 +54,11 @@ typedef struct {
 	float len_coxa;   // distance from hip yaw joint to femur joint along the X axis
 	float len_femur;  // thigh length
 	float len_tibia;  // shank length
+
+	// Servo calibration offsets (radians)
+	float coxa_offset_rad;
+	float femur_offset_rad;
+	float tibia_offset_rad;
 } leg_config_t;
 
 // Create/configure a leg and return a descriptor via out_leg
