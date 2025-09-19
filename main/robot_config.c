@@ -21,34 +21,33 @@ void robot_config_init_default(void) {
         g_cfg.mcpwm_group_id[i] = (i < 3) ? 0 : 1;
         for (int j = 0; j < 3; ++j) g_cfg.servo_gpio[i][j] = -1;
     }
-    // Rebalance within first three legs: move leg 2 to group 1 so group 0 only has two legs (6 channels)
-    g_cfg.mcpwm_group_id[2] = 1;
+    // Rebalance within first three legs: move left-rear leg to group 1 so group 0 only has two legs (6 channels)
+    g_cfg.mcpwm_group_id[LEG_LEFT_REAR] = 1;
 
-    // Temporary GPIO assignment: leg 0 only
-    // Joint order: [0]=COXA (yaw), [1]=FEMUR (pitch), [2]=TIBIA (knee)
-    g_cfg.servo_gpio[0][LEG_SERVO_COXA]  = 13;
-    g_cfg.servo_gpio[0][LEG_SERVO_FEMUR] = 12;
-    g_cfg.servo_gpio[0][LEG_SERVO_TIBIA] = 14;
-    
-    g_cfg.servo_gpio[1][LEG_SERVO_COXA]  = 27;
-    g_cfg.servo_gpio[1][LEG_SERVO_FEMUR] = 26;
-    g_cfg.servo_gpio[1][LEG_SERVO_TIBIA] = 25;
+    // GPIO assignments by leg index enum
+    g_cfg.servo_gpio[LEG_LEFT_FRONT][LEG_SERVO_COXA]  = 13;
+    g_cfg.servo_gpio[LEG_LEFT_FRONT][LEG_SERVO_FEMUR] = 12;
+    g_cfg.servo_gpio[LEG_LEFT_FRONT][LEG_SERVO_TIBIA] = 14;
 
-    g_cfg.servo_gpio[2][LEG_SERVO_COXA]  = -1;
-    g_cfg.servo_gpio[2][LEG_SERVO_FEMUR] = -1;
-    g_cfg.servo_gpio[2][LEG_SERVO_TIBIA] = -1;
+    g_cfg.servo_gpio[LEG_LEFT_MIDDLE][LEG_SERVO_COXA]  = 27;
+    g_cfg.servo_gpio[LEG_LEFT_MIDDLE][LEG_SERVO_FEMUR] = 26;
+    g_cfg.servo_gpio[LEG_LEFT_MIDDLE][LEG_SERVO_TIBIA] = 25;
 
-    g_cfg.servo_gpio[3][LEG_SERVO_COXA]  = 15;
-    g_cfg.servo_gpio[3][LEG_SERVO_FEMUR] = 2;
-    g_cfg.servo_gpio[3][LEG_SERVO_TIBIA] = 4;
+    g_cfg.servo_gpio[LEG_LEFT_REAR][LEG_SERVO_COXA]  = -1;
+    g_cfg.servo_gpio[LEG_LEFT_REAR][LEG_SERVO_FEMUR] = -1;
+    g_cfg.servo_gpio[LEG_LEFT_REAR][LEG_SERVO_TIBIA] = -1;
 
-    g_cfg.servo_gpio[4][LEG_SERVO_COXA]  = 16;
-    g_cfg.servo_gpio[4][LEG_SERVO_FEMUR] = 17;
-    g_cfg.servo_gpio[4][LEG_SERVO_TIBIA] = 5;
+    g_cfg.servo_gpio[LEG_RIGHT_FRONT][LEG_SERVO_COXA]  = 15;
+    g_cfg.servo_gpio[LEG_RIGHT_FRONT][LEG_SERVO_FEMUR] = 2;
+    g_cfg.servo_gpio[LEG_RIGHT_FRONT][LEG_SERVO_TIBIA] = 4;
 
-    g_cfg.servo_gpio[5][LEG_SERVO_COXA]  = -1;
-    g_cfg.servo_gpio[5][LEG_SERVO_FEMUR] = -1;
-    g_cfg.servo_gpio[5][LEG_SERVO_TIBIA] = -1;
+    g_cfg.servo_gpio[LEG_RIGHT_MIDDLE][LEG_SERVO_COXA]  = 16;
+    g_cfg.servo_gpio[LEG_RIGHT_MIDDLE][LEG_SERVO_FEMUR] = 17;
+    g_cfg.servo_gpio[LEG_RIGHT_MIDDLE][LEG_SERVO_TIBIA] = 5;
+
+    g_cfg.servo_gpio[LEG_RIGHT_REAR][LEG_SERVO_COXA]  = -1;
+    g_cfg.servo_gpio[LEG_RIGHT_REAR][LEG_SERVO_FEMUR] = -1;
+    g_cfg.servo_gpio[LEG_RIGHT_REAR][LEG_SERVO_TIBIA] = -1;
 
     // Default geometry for all 6 legs.
     // NOTE: Units must match usage across the project. Our swing_trajectory uses meters,
@@ -107,24 +106,24 @@ void robot_config_init_default(void) {
     
     const float QANGLE = (float)M_PI * 0.25f;   // +45 deg
 
-    // Leg 0 (left-front)
-    g_base_x[0] = X_OFF_FRONT; g_base_y[0] = Y_OFF_LEFT; g_base_z[0] = Z_OFF; g_base_yaw[0] = YAW_LEFT + QANGLE;
-    g_stance_fwd[0] =  0.10f; g_stance_out[0] = 0.15f; // 15 cm outward
-    // Leg 1 (left-middle)
-    g_base_x[1] = 0.0f;        g_base_y[1] = Y_OFF_LEFT; g_base_z[1] = Z_OFF; g_base_yaw[1] = YAW_LEFT;
-    g_stance_fwd[1] = 0.0f; g_stance_out[1] = 0.15f; // 15 cm outward
-    // Leg 2 (left-rear)
-    g_base_x[2] = X_OFF_REAR;  g_base_y[2] = Y_OFF_LEFT; g_base_z[2] = Z_OFF; g_base_yaw[2] = YAW_LEFT - QANGLE;
-    g_stance_fwd[2] = -0.10f; g_stance_out[2] = 0.15f; // 15 cm outward
-    // Leg 3 (right-front)
-    g_base_x[3] = X_OFF_FRONT; g_base_y[3] = Y_OFF_RIGHT; g_base_z[3] = Z_OFF; g_base_yaw[3] = YAW_RIGHT + QANGLE;
-    g_stance_fwd[3] = 0.10f; g_stance_out[3] = 0.15f; // 15 cm outward
-    // Leg 4 (right-middle)
-    g_base_x[4] = 0.0f;        g_base_y[4] = Y_OFF_RIGHT; g_base_z[4] = Z_OFF; g_base_yaw[4] = YAW_RIGHT;
-    g_stance_fwd[4] = 0.0f; g_stance_out[4] = 0.15f; // 15 cm outward
-    // Leg 5 (right-rear)
-    g_base_x[5] = X_OFF_REAR;  g_base_y[5] = Y_OFF_RIGHT; g_base_z[5] = Z_OFF; g_base_yaw[5] = YAW_RIGHT - QANGLE;
-    g_stance_fwd[5] = 0.10f; g_stance_out[5] = 0.15f; // 15 cm outward
+    // Leg mount poses by enum
+    g_base_x[LEG_LEFT_FRONT] = X_OFF_FRONT;  g_base_y[LEG_LEFT_FRONT] = Y_OFF_LEFT;  g_base_z[LEG_LEFT_FRONT] = Z_OFF;  g_base_yaw[LEG_LEFT_FRONT] = YAW_LEFT + QANGLE;
+    g_stance_fwd[LEG_LEFT_FRONT] =  0.10f;   g_stance_out[LEG_LEFT_FRONT] = 0.15f;
+
+    g_base_x[LEG_LEFT_MIDDLE] = 0.0f;        g_base_y[LEG_LEFT_MIDDLE] = Y_OFF_LEFT;  g_base_z[LEG_LEFT_MIDDLE] = Z_OFF;  g_base_yaw[LEG_LEFT_MIDDLE] = YAW_LEFT;
+    g_stance_fwd[LEG_LEFT_MIDDLE] = 0.0f;    g_stance_out[LEG_LEFT_MIDDLE] = 0.15f;
+
+    g_base_x[LEG_LEFT_REAR] = X_OFF_REAR;    g_base_y[LEG_LEFT_REAR] = Y_OFF_LEFT;    g_base_z[LEG_LEFT_REAR] = Z_OFF;    g_base_yaw[LEG_LEFT_REAR] = YAW_LEFT - QANGLE;
+    g_stance_fwd[LEG_LEFT_REAR] = -0.10f;    g_stance_out[LEG_LEFT_REAR] = 0.15f;
+
+    g_base_x[LEG_RIGHT_FRONT] = X_OFF_FRONT; g_base_y[LEG_RIGHT_FRONT] = Y_OFF_RIGHT; g_base_z[LEG_RIGHT_FRONT] = Z_OFF; g_base_yaw[LEG_RIGHT_FRONT] = YAW_RIGHT - QANGLE;
+    g_stance_fwd[LEG_RIGHT_FRONT] = 0.10f;   g_stance_out[LEG_RIGHT_FRONT] = 0.15f;
+
+    g_base_x[LEG_RIGHT_MIDDLE] = 0.0f;       g_base_y[LEG_RIGHT_MIDDLE] = Y_OFF_RIGHT; g_base_z[LEG_RIGHT_MIDDLE] = Z_OFF; g_base_yaw[LEG_RIGHT_MIDDLE] = YAW_RIGHT;
+    g_stance_fwd[LEG_RIGHT_MIDDLE] = 0.0f;   g_stance_out[LEG_RIGHT_MIDDLE] = 0.15f;
+
+    g_base_x[LEG_RIGHT_REAR] = X_OFF_REAR;   g_base_y[LEG_RIGHT_REAR] = Y_OFF_RIGHT;   g_base_z[LEG_RIGHT_REAR] = Z_OFF;   g_base_yaw[LEG_RIGHT_REAR] = YAW_RIGHT + QANGLE;
+    g_stance_fwd[LEG_RIGHT_REAR] = 0.10f;    g_stance_out[LEG_RIGHT_REAR] = 0.15f;
 
     // --- Future hardware settings (not applied here; live in robot_control) ---
     // - Servo pins and MCPWM mapping

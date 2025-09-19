@@ -3,8 +3,8 @@
 
 #include <stdint.h>
 #include "swing_trajectory.h"
+#include "robot_config.h"
 
-#define NUM_LEGS 6
 
 // Joint angles for one leg
 typedef struct {

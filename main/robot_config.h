@@ -2,8 +2,20 @@
 #define ROBOT_CONFIG_H
 
 #include "leg.h"
-#include "whole_body_control.h"
 
+#define NUM_LEGS 6
+
+
+
+// Leg index enumeration for identification
+typedef enum {
+    LEG_LEFT_FRONT = 0,   // x=+0.08, y=+0.05
+    LEG_LEFT_MIDDLE = 1,  // x=0.00,  y=+0.05
+    LEG_LEFT_REAR = 2,    // x=-0.08, y=+0.05
+    LEG_RIGHT_FRONT = 3,  // x=+0.08, y=-0.05
+    LEG_RIGHT_MIDDLE = 4, // x=0.00,  y=-0.05
+    LEG_RIGHT_REAR = 5    // x=-0.08, y=-0.05
+} leg_index_t;
 // Central robot configuration holder.
 // NOTE: Keep this minimal and focused on data; we're planning to move settings to ESP storage later.
 // TODO(ESP-Storage): Persist all fields in NVS (or preferred storage) and load at boot.
