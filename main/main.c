@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
@@ -46,6 +47,7 @@ void app_main(void)
 
     const float dt = 0.01f; // 10ms loop
     while (1) {
+        float ms_start = esp_timer_get_time() / 1000.0f;
         // Read user command (placeholder)
         user_command_poll(&ucmd);
         ucmd.enable = 1; // Force enable for testing
@@ -115,9 +117,15 @@ void app_main(void)
         // cmds.joint_cmds[3].joint_angles[2] = 0.0f;
         // // Send commands to robot
         robot_execute(&cmds);
+        float ms_end = esp_timer_get_time() / 1000.0f;
+        // ESP_LOGI(TAG, "Loop time: %.2f ms", ms_end - ms_start);
 
-        // Wait for next loop (replace with ESP-IDF delay)
-        vTaskDelay((int)(dt * 1000) / portTICK_PERIOD_MS);
+        // Calculate how long to wait to maintain dt period
+        float elapsed = ms_end - ms_start;
+        float wait_ms = (dt * 1000.0f) - elapsed;
+        if (wait_ms > 0) {
+            vTaskDelay((int)wait_ms / portTICK_PERIOD_MS);
+        }
         // loop timing governed by vTaskDelay; phase advanced via dt
     }
 }
