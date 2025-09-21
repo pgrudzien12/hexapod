@@ -63,7 +63,7 @@ void swing_trajectory_generate(swing_trajectory_t *trajectory, const gait_schedu
         foot_position_t *p = &trajectory->desired_positions[i];
         float p_i; // local phase of the individual leg
         if (cmd->gait == GAIT_TRIPOD) {
-            bool inA = (i == 0 || i == 3 || i == 4);
+            bool inA = (i == LEG_LEFT_FRONT || i == LEG_RIGHT_MIDDLE || i == LEG_LEFT_REAR);
             float offset = inA ? 0.0f : 0.5f;
             p_i = fracf(phase + offset);
         } else if (cmd->gait == GAIT_RIPPLE) {
@@ -96,19 +96,19 @@ void swing_trajectory_generate(swing_trajectory_t *trajectory, const gait_schedu
             z_rel = 0.0f;
         }
 
-    // Convert offsets to absolute body-frame targets by adding each leg's base pose
-    float bx, by, bz, yaw;
-    robot_config_get_base_pose(i, &bx, &by, &bz, &yaw);
-    // Apply neutral stance reach in leg-local frame (X_outward, Y_forward), rotated to body frame
-    float out_m = robot_config_get_stance_out_m(i);
-    float fwd_m = robot_config_get_stance_fwd_m(i);
-    float cy = cosf(yaw), sy = sinf(yaw);
-    float dx_stance = cy * out_m - sy * fwd_m;
-    float dy_stance = sy * out_m + cy * fwd_m;
+        // Convert offsets to absolute body-frame targets by adding each leg's base pose
+        float bx, by, bz, yaw;
+        robot_config_get_base_pose(i, &bx, &by, &bz, &yaw);
+        // Apply neutral stance reach in leg-local frame (X_outward, Y_forward), rotated to body frame
+        float out_m = robot_config_get_stance_out_m(i);
+        float fwd_m = robot_config_get_stance_fwd_m(i);
+        float cy = cosf(yaw), sy = sinf(yaw);
+        float dx_stance = cy * out_m - sy * fwd_m;
+        float dy_stance = sy * out_m + cy * fwd_m;
 
-    p->x = bx + dx_stance + x_rel;
-    p->y = by + dy_stance + body_y;
-    p->z = bz + body_z + z_rel; // include base z in case it's non-zero
+        p->x = bx + dx_stance + x_rel;
+        p->y = by + dy_stance + body_y;
+        p->z = bz + body_z + z_rel; // include base z in case it's non-zero
         // TODO: Add simple body roll/pitch offsets when pose_mode is active
     }
 }

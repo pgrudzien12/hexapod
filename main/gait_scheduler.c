@@ -1,4 +1,5 @@
 #include "gait_scheduler.h"
+#include "robot_config.h"
 #include <assert.h>
 
 void gait_scheduler_init(gait_scheduler_t *scheduler, float cycle_time) {
@@ -38,10 +39,10 @@ void gait_scheduler_update(gait_scheduler_t *scheduler, float dt, const user_com
     // TODO: Replace with well-defined groupings and exact phase windows per gait.
     switch (cmd->gait) {
         case GAIT_TRIPOD: {
-            // tripod groups: {0,3,4} swing when phase < 0.5, others support; then swap
+            // tripod groups: {LEG_LEFT_FRONT, LEG_RIGHT_MIDDLE, LEG_LEFT_REAR} swing when phase < 0.5, others support; then swap
             bool groupA = (scheduler->phase < 0.5f);
             for (int i = 0; i < NUM_LEGS; ++i) {
-                bool inA = (i == 0 || i == 3 || i == 4);
+                bool inA = (i == LEG_LEFT_FRONT || i == LEG_RIGHT_MIDDLE || i == LEG_LEFT_REAR);
                 bool swing = (groupA ? inA : !inA);
                 scheduler->leg_states[i] = swing ? LEG_SWING : LEG_SUPPORT;
             }
