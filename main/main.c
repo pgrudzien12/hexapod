@@ -17,7 +17,6 @@
 #include "robot_config.h"
 #include "user_command.h"
 #include "controller.h"
-#include "leg_debugger.h"
 
 static const char *TAG = "leg";
 
@@ -42,13 +41,6 @@ void app_main(void)
     gait_scheduler_init(&scheduler, 0.25f); // 0.5 second cycle time
     swing_trajectory_init(&trajectory, 0.10f, 0.03f); // 10cm step, 3cm clearance
     robot_config_init_default();
-    // Debugger wiring
-    leg_debugger_init(
-        robot_config_debug_enabled(),
-        robot_config_debug_leg_index(),
-        robot_config_debug_delta_thresh(),
-        robot_config_debug_min_interval_ms()
-    );
     // TODO: Calibrate swing_trajectory y/z ranges for your robot; WBC expects meters
     user_command_init();
 
@@ -58,7 +50,7 @@ void app_main(void)
         user_command_poll(&ucmd);
         ucmd.enable = 1; // Force enable for testing
         ucmd.gait = GAIT_TRIPOD;
-        ucmd.vx = 1.f; // Forward 120% max speed
+        ucmd.vx = 1.f; 
         ucmd.step_scale = 1.0f; // Medium step length
 
         // ESP_LOGI(TAG, "Cmd: gait=%d vx=%.2f step_scale=%.2f z_target=%.2f y_offset=%.2f terrain_climb=%d enable=%d",
@@ -98,9 +90,9 @@ void app_main(void)
         //          trajectory.desired_positions[5].z);
 
         // // Compute joint commands from trajectories
-        // trajectory.desired_positions[0].x = 0.08f;
-        // trajectory.desired_positions[0].y = 0.15f;
-        // trajectory.desired_positions[0].z = 0.12f;
+        trajectory.desired_positions[0].x = 0.25f;
+        trajectory.desired_positions[0].y = 0.15f;
+        trajectory.desired_positions[0].z = 0.08f;
         whole_body_control_compute(&trajectory, &cmds);
         // ESP_LOGI(TAG, "Cmds: L1=(%.1f, %.1f, %.1f) L2=(%.1f, %.1f, %.1f) L3=(%.1f, %.1f, %.1f)",
         //      ((float*)(&cmds.joint_cmds[0]))[0],
@@ -118,9 +110,9 @@ void app_main(void)
         // cmds.joint_cmds[0].joint_angles[0] = 0.0f;
         // cmds.joint_cmds[0].joint_angles[1] = 0.0f;
         // cmds.joint_cmds[0].joint_angles[2] = 0.0f;
-        // cmds.joint_cmds[1].joint_angles[0] = 0.0f;
-        // cmds.joint_cmds[1].joint_angles[1] = 0.0f;
-        // cmds.joint_cmds[1].joint_angles[2] = 0.0f;
+        // cmds.joint_cmds[3].joint_angles[0] = 0.0f;
+        // cmds.joint_cmds[3].joint_angles[1] = 0.0f;
+        // cmds.joint_cmds[3].joint_angles[2] = 0.0f;
         // // Send commands to robot
         robot_execute(&cmds);
 

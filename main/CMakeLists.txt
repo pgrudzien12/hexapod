@@ -9,6 +9,5 @@ idf_component_register(
     "robot_config.c"
     "user_command.c"
     "controller.c"
-    "leg_debugger.c"
     INCLUDE_DIRS "."
 )
