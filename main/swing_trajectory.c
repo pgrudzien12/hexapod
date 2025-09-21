@@ -100,7 +100,7 @@ void swing_trajectory_generate(swing_trajectory_t *trajectory, const gait_schedu
         float bx, by, bz, yaw;
         robot_config_get_base_pose(i, &bx, &by, &bz, &yaw);
         // Apply neutral stance reach in leg-local frame (X_outward, Y_forward), rotated to body frame
-        float out_m = robot_config_get_stance_out_m(i);
+        float out_m = robot_config_get_stance_out_m(i); 
         float fwd_m = robot_config_get_stance_fwd_m(i);
         float cy = cosf(yaw), sy = sinf(yaw);
         float dx_stance = cy * out_m - sy * fwd_m;
