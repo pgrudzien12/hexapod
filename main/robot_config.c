@@ -107,23 +107,47 @@ void robot_config_init_default(void) {
     const float QANGLE = (float)M_PI * 0.25f;   // +45 deg
 
     // Leg mount poses by enum
-    g_base_x[LEG_LEFT_FRONT] = X_OFF_FRONT;  g_base_y[LEG_LEFT_FRONT] = Y_OFF_LEFT;  g_base_z[LEG_LEFT_FRONT] = Z_OFF;  g_base_yaw[LEG_LEFT_FRONT] = YAW_LEFT + QANGLE;
-    g_stance_fwd[LEG_LEFT_FRONT] =  0.10f;   g_stance_out[LEG_LEFT_FRONT] = 0.15f;
+    g_base_x[LEG_LEFT_FRONT] = X_OFF_FRONT;  
+    g_base_y[LEG_LEFT_FRONT] = Y_OFF_LEFT;  
+    g_base_z[LEG_LEFT_FRONT] = Z_OFF;  
+    g_base_yaw[LEG_LEFT_FRONT] = YAW_LEFT + QANGLE;
+    g_stance_fwd[LEG_LEFT_FRONT] =  0.10f;   
+    g_stance_out[LEG_LEFT_FRONT] = 0.15f;
 
-    g_base_x[LEG_LEFT_MIDDLE] = 0.0f;        g_base_y[LEG_LEFT_MIDDLE] = Y_OFF_LEFT;  g_base_z[LEG_LEFT_MIDDLE] = Z_OFF;  g_base_yaw[LEG_LEFT_MIDDLE] = YAW_LEFT;
-    g_stance_fwd[LEG_LEFT_MIDDLE] = 0.0f;    g_stance_out[LEG_LEFT_MIDDLE] = 0.15f;
+    g_base_x[LEG_LEFT_MIDDLE] = 0.0f;
+    g_base_y[LEG_LEFT_MIDDLE] = Y_OFF_LEFT; 
+    g_base_z[LEG_LEFT_MIDDLE] = Z_OFF;
+    g_base_yaw[LEG_LEFT_MIDDLE] = YAW_LEFT;
+    g_stance_fwd[LEG_LEFT_MIDDLE] = 0.0f; 
+    g_stance_out[LEG_LEFT_MIDDLE] = 0.15f;
 
-    g_base_x[LEG_LEFT_REAR] = X_OFF_REAR;    g_base_y[LEG_LEFT_REAR] = Y_OFF_LEFT;    g_base_z[LEG_LEFT_REAR] = Z_OFF;    g_base_yaw[LEG_LEFT_REAR] = YAW_LEFT - QANGLE;
-    g_stance_fwd[LEG_LEFT_REAR] = -0.10f;    g_stance_out[LEG_LEFT_REAR] = 0.15f;
+    g_base_x[LEG_LEFT_REAR] = X_OFF_REAR;  
+    g_base_y[LEG_LEFT_REAR] = Y_OFF_LEFT; 
+    g_base_z[LEG_LEFT_REAR] = Z_OFF;  
+    g_base_yaw[LEG_LEFT_REAR] = YAW_LEFT - QANGLE;
+    g_stance_fwd[LEG_LEFT_REAR] = -0.10f; 
+    g_stance_out[LEG_LEFT_REAR] = 0.15f;
 
-    g_base_x[LEG_RIGHT_FRONT] = X_OFF_FRONT; g_base_y[LEG_RIGHT_FRONT] = Y_OFF_RIGHT; g_base_z[LEG_RIGHT_FRONT] = Z_OFF; g_base_yaw[LEG_RIGHT_FRONT] = YAW_RIGHT - QANGLE;
-    g_stance_fwd[LEG_RIGHT_FRONT] = 0.10f;   g_stance_out[LEG_RIGHT_FRONT] = 0.15f;
+    g_base_x[LEG_RIGHT_FRONT] = X_OFF_FRONT;
+    g_base_y[LEG_RIGHT_FRONT] = Y_OFF_RIGHT;
+    g_base_z[LEG_RIGHT_FRONT] = Z_OFF;
+    g_base_yaw[LEG_RIGHT_FRONT] = YAW_RIGHT - QANGLE;
+    g_stance_fwd[LEG_RIGHT_FRONT] = 0.10f;
+    g_stance_out[LEG_RIGHT_FRONT] = 0.15f;
 
-    g_base_x[LEG_RIGHT_MIDDLE] = 0.0f;       g_base_y[LEG_RIGHT_MIDDLE] = Y_OFF_RIGHT; g_base_z[LEG_RIGHT_MIDDLE] = Z_OFF; g_base_yaw[LEG_RIGHT_MIDDLE] = YAW_RIGHT;
-    g_stance_fwd[LEG_RIGHT_MIDDLE] = 0.0f;   g_stance_out[LEG_RIGHT_MIDDLE] = 0.15f;
+    g_base_x[LEG_RIGHT_MIDDLE] = 0.0f;     
+    g_base_y[LEG_RIGHT_MIDDLE] = Y_OFF_RIGHT; 
+    g_base_z[LEG_RIGHT_MIDDLE] = Z_OFF; 
+    g_base_yaw[LEG_RIGHT_MIDDLE] = YAW_RIGHT;
+    g_stance_fwd[LEG_RIGHT_MIDDLE] = 0.0f;  
+    g_stance_out[LEG_RIGHT_MIDDLE] = 0.15f;
 
-    g_base_x[LEG_RIGHT_REAR] = X_OFF_REAR;   g_base_y[LEG_RIGHT_REAR] = Y_OFF_RIGHT;   g_base_z[LEG_RIGHT_REAR] = Z_OFF;   g_base_yaw[LEG_RIGHT_REAR] = YAW_RIGHT + QANGLE;
-    g_stance_fwd[LEG_RIGHT_REAR] = 0.10f;    g_stance_out[LEG_RIGHT_REAR] = 0.15f;
+    g_base_x[LEG_RIGHT_REAR] = X_OFF_REAR;  
+    g_base_y[LEG_RIGHT_REAR] = Y_OFF_RIGHT;  
+    g_base_z[LEG_RIGHT_REAR] = Z_OFF;   
+    g_base_yaw[LEG_RIGHT_REAR] = YAW_RIGHT + QANGLE;
+    g_stance_fwd[LEG_RIGHT_REAR] = 0.10f;   
+    g_stance_out[LEG_RIGHT_REAR] = 0.15f;
 
     // --- Future hardware settings (not applied here; live in robot_control) ---
     // - Servo pins and MCPWM mapping
