@@ -21,17 +21,8 @@
 
 static const char *TAG = "leg";
 
-// Define the three servo pins for the leg here
-#define LEG_SERVO1_GPIO 13
-#define LEG_SERVO2_GPIO 12
-#define LEG_SERVO3_GPIO 14
-
-float deg_to_rad(float degrees) {
-    return degrees * (M_PI / 180.0f);
-}
-
 // --- Gait Framework Main Loop ---
-void app_main(void)
+void gait_framework_main(void *arg)
 {
     gait_scheduler_t scheduler;
     swing_trajectory_t trajectory;
@@ -39,7 +30,7 @@ void app_main(void)
     user_command_t ucmd;
 
     // Initialize modules with example parameters
-    gait_scheduler_init(&scheduler, 0.25f); // 0.5 second cycle time
+    gait_scheduler_init(&scheduler, 2.f); // 1 second cycle time
     swing_trajectory_init(&trajectory, 0.10f, 0.03f); // 10cm step, 3cm clearance
     robot_config_init_default();
     // TODO: Calibrate swing_trajectory y/z ranges for your robot; WBC expects meters
@@ -47,7 +38,7 @@ void app_main(void)
 
     const float dt = 0.01f; // 10ms loop
     while (1) {
-        float ms_start = esp_timer_get_time() / 1000.0f;
+        float time_start = esp_timer_get_time();
         // Read user command (placeholder)
         user_command_poll(&ucmd);
 
@@ -63,22 +54,29 @@ void app_main(void)
         swing_trajectory_generate(&trajectory, &scheduler, &ucmd);
 
         // Compute joint commands from trajectories
-        trajectory.desired_positions[0].x = 0.25f;
-        trajectory.desired_positions[0].y = 0.15f;
-        trajectory.desired_positions[0].z = 0.08f;
+        // trajectory.desired_positions[0].x = 0.25f;
+        // trajectory.desired_positions[0].y = 0.15f;
+        // trajectory.desired_positions[0].z = 0.08f;
         whole_body_control_compute(&trajectory, &cmds);
 
         // Send commands to robot
         robot_execute(&cmds);
-        float ms_end = esp_timer_get_time() / 1000.0f;
+
+        
+        float time_end = esp_timer_get_time();
 
         // Calculate how long to wait to maintain dt period
         // this reports about 0.41 ms per loop if no logging
-        float elapsed = ms_end - ms_start;
+        float elapsed = (time_end - time_start) / 1000.0f;
+        // wait at least 1 tick to yield to other tasks
         float wait_ms = (dt * 1000.0f) - elapsed;
-        if (wait_ms > 0) {
-            vTaskDelay((int)wait_ms / portTICK_PERIOD_MS);
-        }
-        // loop timing governed by vTaskDelay; phase advanced via dt
+        int wait_ticks = (int)(wait_ms / portTICK_PERIOD_MS);
+        if (wait_ticks < 1) wait_ticks = 1; // Ensure at least 1 tick
+        vTaskDelay(wait_ticks);
     }
+}
+
+void app_main(void)
+{
+    gait_framework_main(NULL);
 }

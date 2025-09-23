@@ -16,7 +16,7 @@
 //     Z_leg = Z_body for all (already down-positive)
 // TODO: Replace with full per-leg transform using mount poses and yaw angles.
 
-const char *TAG = "wbc";
+static const char *TAG = "wbc";
 
 static inline int is_right_leg(int idx) {
     return (idx >= 3); // 0,1,2 left; 3,4,5 right
@@ -65,7 +65,9 @@ void whole_body_control_compute(const swing_trajectory_t *trajectory, whole_body
         if (leg_ik_solve(leg, x_leg, y_leg, z_leg, &q) == ESP_OK) {
             // Store actual joint angles (radians). Order: coxa, femur, tibia.
             // NOTE: Calibration offsets/limits are applied later in robot_control.
-            ESP_LOGI(TAG, "Leg %d IK: BodyXYZ(%.3f, %.3f, %.3f) -> LegXYZ(%.3f, %.3f, %.3f) -> LegAng(%.3f, %.3f, %.3f)", i, x_body, y_body, z_body, x_leg, y_leg, z_leg, q.coxa, q.femur, q.tibia);
+            if (i == 0) {
+                ESP_LOGI(TAG, "Leg %d IK: BodyXYZ(%.3f, %.3f, %.3f) -> LegXYZ(%.3f, %.3f, %.3f) -> LegAng(%.3f, %.3f, %.3f)", i, x_body, y_body, z_body, x_leg, y_leg, z_leg, q.coxa, q.femur, q.tibia);
+            }
             cmds->joint_cmds[i].joint_angles[0] = q.coxa;
             cmds->joint_cmds[i].joint_angles[1] = q.femur;
             cmds->joint_cmds[i].joint_angles[2] = q.tibia;

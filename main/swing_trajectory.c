@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <assert.h>
 #include "robot_config.h"
+#include "esp_log.h"
+static const char *TAG = "swing_traj";
 
 void swing_trajectory_init(swing_trajectory_t *trajectory, float step_length, float clearance_height) {
     trajectory->step_length = step_length;
@@ -109,6 +111,9 @@ void swing_trajectory_generate(swing_trajectory_t *trajectory, const gait_schedu
         p->x = bx + dx_stance + x_rel;
         p->y = by + dy_stance + body_y;
         p->z = bz + body_z + z_rel; // include base z in case it's non-zero
+        // if (i == 0) {
+        //     ESP_LOGI(TAG, "Leg %d: bXYZ=(%.3f, %.3f, %.3f) dXYZ=(%.3f, %.3f, %.3f) p_i=%.3f swing=%d tau=%.3f x_rel=%.3f body_y=%.3f z_rel=%.3f -> pos=(%.3f, %.3f, %.3f)", i, bx, by, bz, dx_stance, dy_stance, body_z, p_i, swing, tau, x_rel, body_y, z_rel, p->x, p->y, p->z);
+        // }
         // TODO: Add simple body roll/pitch offsets when pose_mode is active
     }
 }
