@@ -5,9 +5,11 @@
 #include "gait_scheduler.h" // for leg_state_t and NUM_LEGS
 
 typedef struct {
+    // Body frame (right-handed): X forward, Y left, Z up.
+    // z is absolute height above reference plane (e.g., ground). Lower foot = smaller z.
     float x;
     float y;
-    float z;
+    float z; // Z up
 } foot_position_t;
 
 typedef struct {
@@ -19,9 +21,10 @@ typedef struct {
     //       so they can be tuned without recompiling.
     float y_range_m;   // maps y_offset: -1..+1 -> +/- y_range_m
     // Absolute body height limits (meters) for safe mapping of z_target
-    // If +Z is down, both should be positive; z_min_m is the closest-to-body value.
-    float z_min_m;     // minimum allowed body Z (e.g., 0.05 m)
-    float z_max_m;     // maximum allowed body Z (e.g., 0.10 m)
+    // For Z up convention: z_min_m < z_max_m, both positive heights.
+    // Foot target heights should stay within [z_min_m, z_max_m].
+    float z_min_m;     // minimum allowed foot height (closest to ground)
+    float z_max_m;     // maximum allowed foot height (lift limit)
 } swing_trajectory_t;
 
 void swing_trajectory_init(swing_trajectory_t *trajectory, float step_length, float clearance_height);

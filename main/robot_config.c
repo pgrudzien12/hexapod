@@ -33,9 +33,9 @@ void robot_config_init_default(void) {
     g_cfg.servo_gpio[LEG_LEFT_MIDDLE][LEG_SERVO_FEMUR] = 26;
     g_cfg.servo_gpio[LEG_LEFT_MIDDLE][LEG_SERVO_TIBIA] = 25;
 
-    g_cfg.servo_gpio[LEG_LEFT_REAR][LEG_SERVO_COXA]  = -1;
-    g_cfg.servo_gpio[LEG_LEFT_REAR][LEG_SERVO_FEMUR] = -1;
-    g_cfg.servo_gpio[LEG_LEFT_REAR][LEG_SERVO_TIBIA] = -1;
+    g_cfg.servo_gpio[LEG_LEFT_REAR][LEG_SERVO_COXA]  = 33;
+    g_cfg.servo_gpio[LEG_LEFT_REAR][LEG_SERVO_FEMUR] = 32;
+    g_cfg.servo_gpio[LEG_LEFT_REAR][LEG_SERVO_TIBIA] = 35;
 
     g_cfg.servo_gpio[LEG_RIGHT_FRONT][LEG_SERVO_COXA]  = 15;
     g_cfg.servo_gpio[LEG_RIGHT_FRONT][LEG_SERVO_FEMUR] = 2;
@@ -45,9 +45,9 @@ void robot_config_init_default(void) {
     g_cfg.servo_gpio[LEG_RIGHT_MIDDLE][LEG_SERVO_FEMUR] = 17;
     g_cfg.servo_gpio[LEG_RIGHT_MIDDLE][LEG_SERVO_TIBIA] = 5;
 
-    g_cfg.servo_gpio[LEG_RIGHT_REAR][LEG_SERVO_COXA]  = -1;
-    g_cfg.servo_gpio[LEG_RIGHT_REAR][LEG_SERVO_FEMUR] = -1;
-    g_cfg.servo_gpio[LEG_RIGHT_REAR][LEG_SERVO_TIBIA] = -1;
+    g_cfg.servo_gpio[LEG_RIGHT_REAR][LEG_SERVO_COXA]  = 18;
+    g_cfg.servo_gpio[LEG_RIGHT_REAR][LEG_SERVO_FEMUR] = 19;
+    g_cfg.servo_gpio[LEG_RIGHT_REAR][LEG_SERVO_TIBIA] = 21;
 
     // Default geometry for all 6 legs.
     // NOTE: Units must match usage across the project. Our swing_trajectory uses meters,
@@ -73,7 +73,11 @@ void robot_config_init_default(void) {
         for (int j = 0; j < 3; ++j) {
             joint_calib_t *c = &g_cfg.joint_calib[i][j];
             c->zero_offset_rad = 0.0f;
-            c->invert_sign = 1;
+            if (j == LEG_SERVO_COXA || j == LEG_SERVO_TIBIA) {
+                c->invert_sign = -1; // coxa often needs inversion
+            } else {
+                c->invert_sign = 1;
+            }
             c->min_rad = (float)-M_PI * 0.5f;
             c->max_rad = (float) M_PI * 0.5f;
             c->pwm_min_us = 500;
@@ -84,7 +88,7 @@ void robot_config_init_default(void) {
 
     // --- Mount poses (defaults) ---
     // Indexing convention (example): 0..2 left front->rear, 3..5 right front->rear.
-    // Body frame: x forward (+), y left (+), z down (+).
+    // Body frame: x forward (+), y left (+), z up (+).
     // User defaults:
     //  - Front/back legs offset in x by ±0.08 m (front +0.08, back -0.08)
     //  - All legs offset in y by ±0.05 m (left +0.05, right -0.05)
@@ -105,49 +109,44 @@ void robot_config_init_default(void) {
     const float YAW_RIGHT   = (float)-M_PI * 0.5f;  // -90 deg
     
     const float QANGLE = (float)M_PI * 0.25f;   // +45 deg
+    const float STD_STANCE_OUT = 0.23f; // meters
+    const float STD_STANCE_FWD = 0.0f;  // meters
+
+    for (int i = 0; i < NUM_LEGS; ++i) {
+        g_stance_out[i] = STD_STANCE_OUT;
+        g_stance_fwd[i] = STD_STANCE_FWD;
+    }
 
     // Leg mount poses by enum
     g_base_x[LEG_LEFT_FRONT] = X_OFF_FRONT;  
     g_base_y[LEG_LEFT_FRONT] = Y_OFF_LEFT;  
     g_base_z[LEG_LEFT_FRONT] = Z_OFF;  
     g_base_yaw[LEG_LEFT_FRONT] = YAW_LEFT - QANGLE;
-    g_stance_fwd[LEG_LEFT_FRONT] =  0.0f;   
-    g_stance_out[LEG_LEFT_FRONT] = 0.15f;
 
     g_base_x[LEG_LEFT_MIDDLE] = 0.0f;
     g_base_y[LEG_LEFT_MIDDLE] = Y_OFF_LEFT; 
     g_base_z[LEG_LEFT_MIDDLE] = Z_OFF;
     g_base_yaw[LEG_LEFT_MIDDLE] = YAW_LEFT;
-    g_stance_fwd[LEG_LEFT_MIDDLE] = 0.0f; 
-    g_stance_out[LEG_LEFT_MIDDLE] = 0.15f;
 
     g_base_x[LEG_LEFT_REAR] = X_OFF_REAR;  
     g_base_y[LEG_LEFT_REAR] = Y_OFF_LEFT; 
     g_base_z[LEG_LEFT_REAR] = Z_OFF;  
     g_base_yaw[LEG_LEFT_REAR] = YAW_LEFT + QANGLE;
-    g_stance_fwd[LEG_LEFT_REAR] = 0.0f; 
-    g_stance_out[LEG_LEFT_REAR] = 0.15f;
 
     g_base_x[LEG_RIGHT_FRONT] = X_OFF_FRONT;
     g_base_y[LEG_RIGHT_FRONT] = Y_OFF_RIGHT;
     g_base_z[LEG_RIGHT_FRONT] = Z_OFF;
     g_base_yaw[LEG_RIGHT_FRONT] = YAW_RIGHT + QANGLE;
-    g_stance_fwd[LEG_RIGHT_FRONT] = 0.0f;
-    g_stance_out[LEG_RIGHT_FRONT] = 0.15f;
 
     g_base_x[LEG_RIGHT_MIDDLE] = 0.0f;     
     g_base_y[LEG_RIGHT_MIDDLE] = Y_OFF_RIGHT; 
     g_base_z[LEG_RIGHT_MIDDLE] = Z_OFF; 
     g_base_yaw[LEG_RIGHT_MIDDLE] = YAW_RIGHT;
-    g_stance_fwd[LEG_RIGHT_MIDDLE] = 0.0f;  
-    g_stance_out[LEG_RIGHT_MIDDLE] = 0.15f;
 
     g_base_x[LEG_RIGHT_REAR] = X_OFF_REAR;  
     g_base_y[LEG_RIGHT_REAR] = Y_OFF_RIGHT;  
     g_base_z[LEG_RIGHT_REAR] = Z_OFF;   
     g_base_yaw[LEG_RIGHT_REAR] = YAW_RIGHT - QANGLE;
-    g_stance_fwd[LEG_RIGHT_REAR] = 0.0f;   
-    g_stance_out[LEG_RIGHT_REAR] = 0.15f;
 
     // --- Future hardware settings (not applied here; live in robot_control) ---
     // - Servo pins and MCPWM mapping
@@ -200,9 +199,6 @@ int robot_config_debug_leg_index(void) {
 }
 float robot_config_debug_delta_thresh(void) {
     return g_cfg.debug_leg_delta_thresh;
-}
-unsigned int robot_config_debug_min_interval_ms(void) {
-    return g_cfg.debug_leg_min_interval_ms;
 }
 
 float robot_config_get_stance_out_m(int leg_index) {

@@ -68,7 +68,11 @@ void robot_config_init_default(void);
 leg_handle_t robot_config_get_leg(int leg_index);
 
 // Get per-leg mount pose in body frame (meters, radians).
-// x: forward (+), y: left (+), z: down (+), yaw: rotation about +Z.
+// Right-handed body frame convention:
+//   X: forward (+)
+//   Y: left (+)
+//   Z: up (+)
+// yaw: rotation about +Z (right-handed, CCW positive when looking down from above)
 void robot_config_get_base_pose(int leg_index, float *x, float *y, float *z, float *yaw);
 
 // Get per-joint calibration (read-only pointer; lifetime of process).
@@ -84,7 +88,6 @@ int robot_config_get_mcpwm_group(int leg_index);
 int robot_config_debug_enabled(void);
 int robot_config_debug_leg_index(void);
 float robot_config_debug_delta_thresh(void);
-unsigned int robot_config_debug_min_interval_ms(void);
 
 // Stance getters (per leg). In leg-local axes: X_outward (+), Y_forward (+). Units: meters.
 float robot_config_get_stance_out_m(int leg_index);

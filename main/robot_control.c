@@ -181,5 +181,6 @@ void robot_execute(const whole_body_cmd_t *cmds) {
         (void)robot_set_joint_angle_rad(i, LEG_SERVO_COXA,  coxa);
         (void)robot_set_joint_angle_rad(i, LEG_SERVO_FEMUR, femur);
         (void)robot_set_joint_angle_rad(i, LEG_SERVO_TIBIA, tibia);
+        // break;
     }
 }

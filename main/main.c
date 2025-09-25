@@ -31,7 +31,7 @@ void gait_framework_main(void *arg)
 
     // Initialize modules with example parameters
     gait_scheduler_init(&scheduler, 2.f); // 1 second cycle time
-    swing_trajectory_init(&trajectory, 0.10f, 0.03f); // 10cm step, 3cm clearance
+    swing_trajectory_init(&trajectory, 0.06f, 0.03f); // 6cm step, 3cm clearance
     robot_config_init_default();
     // TODO: Calibrate swing_trajectory y/z ranges for your robot; WBC expects meters
     user_command_init();
@@ -45,6 +45,7 @@ void gait_framework_main(void *arg)
         ucmd.enable = 1; // Force enable for testing
         ucmd.gait = GAIT_TRIPOD;
         ucmd.vx = 1.f; 
+        ucmd.z_target = 0.0f; // Mid height
         ucmd.step_scale = 1.0f; // Medium step length
 
         // Update gait scheduler (leg phases)
@@ -53,12 +54,15 @@ void gait_framework_main(void *arg)
         // // Generate swing trajectories for legs using scheduler + command
         swing_trajectory_generate(&trajectory, &scheduler, &ucmd);
 
-        // Compute joint commands from trajectories
-        // trajectory.desired_positions[0].x = 0.25f;
-        // trajectory.desired_positions[0].y = 0.15f;
-        // trajectory.desired_positions[0].z = 0.08f;
-        whole_body_control_compute(&trajectory, &cmds);
 
+        // Compute joint commands from trajectories
+        // trajectory.desired_positions[0].x = 0.080;
+        // trajectory.desired_positions[0].y = 0.23f;
+        // trajectory.desired_positions[0].z = -0.00f;
+        whole_body_control_compute(&trajectory, &cmds);
+        // cmds.joint_cmds[0].joint_angles[0] = 0.0f;
+        // cmds.joint_cmds[0].joint_angles[1] = 0.0f;
+        // cmds.joint_cmds[0].joint_angles[2] = scheduler.phase * M_PI/4.0; // test tibia motion
         // Send commands to robot
         robot_execute(&cmds);
 
@@ -72,6 +76,7 @@ void gait_framework_main(void *arg)
         float wait_ms = (dt * 1000.0f) - elapsed;
         int wait_ticks = (int)(wait_ms / portTICK_PERIOD_MS);
         if (wait_ticks < 1) wait_ticks = 1; // Ensure at least 1 tick
+        // ESP_LOGI(TAG, "Loop time: %.3f ms, wait: %.3f ms (%d ticks)", elapsed, wait_ms, wait_ticks);
         vTaskDelay(wait_ticks);
     }
 }

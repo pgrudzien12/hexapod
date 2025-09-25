@@ -12,8 +12,8 @@ void swing_trajectory_init(swing_trajectory_t *trajectory, float step_length, fl
     trajectory->clearance_height = clearance_height;
     // TODO: Make these configurable via Kconfig or runtime config
     trajectory->y_range_m = 0.05f; // +/-5 cm lateral
-    trajectory->z_min_m = 0.05f;   // 5 cm min body height (avoid hitting battery)
-    trajectory->z_max_m = 0.15f;   // 15 cm max body height
+    trajectory->z_min_m = -0.05f;   // 5 cm min body height (avoid hitting battery)
+    trajectory->z_max_m = -0.15f;   // 15 cm max body height
     for (int i = 0; i < NUM_LEGS; ++i) {
         trajectory->desired_positions[i].x = 0.0f;
         trajectory->desired_positions[i].y = 0.0f;
@@ -43,11 +43,10 @@ void swing_trajectory_generate(swing_trajectory_t *trajectory, const gait_schedu
     if (!enabled) speed_mag = 0.0f;
     float L = trajectory->step_length * scale * speed_mag; // effective step length (meters)
     float clr = trajectory->clearance_height * (cmd->terrain_climb ? 1.5f : 1.0f);
-    // Map normalized pose to meters
-    // New: map z_target in [-1,1] to [z_min_m, z_max_m] to enforce safe body height
-    // TODO: Confirm axis convention (+Z down vs up) and adjust sign if needed
+    // Map normalized pose to meters (Z UP): z_target in [-1,1] -> [z_min_m, z_max_m]
+    // z_min_m: lower foot height (closer to ground), z_max_m: higher (lifted)
     float z_n = clampf(cmd->z_target, -1.0f, 1.0f);
-    float body_z = trajectory->z_min_m + (0.5f * (z_n + 1.0f)) * (trajectory->z_max_m - trajectory->z_min_m);
+    float body_z = trajectory->z_min_m + 0.5f * (z_n + 1.0f) * (trajectory->z_max_m - trajectory->z_min_m);
     float body_y = clampf(cmd->y_offset, -1.0f, 1.0f) * trajectory->y_range_m; // meters
 
     // Determine swing fraction S per gait (0 < S < 1)
@@ -85,15 +84,14 @@ void swing_trajectory_generate(swing_trajectory_t *trajectory, const gait_schedu
         tau = clampf(tau, 0.0f, 1.0f);
 
         // Cycloid-like arc for swing; flat for support
-        float x_rel;
-        float z_rel;
+    float x_rel;
+    float z_rel; // Z up: 0 at stance, positive during lift
         if (swing) {
-            // forward from -L/2 to +L/2 with vertical arc
+            // forward from -L/2 to +L/2 with vertical arc (positive Z lift)
             x_rel = (-0.5f + tau) * L * (vx_n >= 0.0f ? 1.0f : -1.0f);
-            // smooth arch peaking at mid; sin(pi*tau) shape
-            z_rel = -clr * sinf((float)M_PI * tau);
+            z_rel =  clr * sinf((float)M_PI * tau); // peak at mid
         } else {
-            // support: backward from +L/2 to -L/2 at ground
+            // support: backward from +L/2 to -L/2 at ground height
             x_rel = (0.5f - tau) * L * (vx_n >= 0.0f ? 1.0f : -1.0f);
             z_rel = 0.0f;
         }
@@ -110,7 +108,7 @@ void swing_trajectory_generate(swing_trajectory_t *trajectory, const gait_schedu
 
         p->x = bx + dx_stance + x_rel;
         p->y = by + dy_stance + body_y;
-        p->z = bz + body_z + z_rel; // include base z in case it's non-zero
+        p->z = bz + body_z + z_rel; // Z up absolute
         // if (i == 0) {
         //     ESP_LOGI(TAG, "Leg %d: bXYZ=(%.3f, %.3f, %.3f) dXYZ=(%.3f, %.3f, %.3f) p_i=%.3f swing=%d tau=%.3f x_rel=%.3f body_y=%.3f z_rel=%.3f -> pos=(%.3f, %.3f, %.3f)", i, bx, by, bz, dx_stance, dy_stance, body_z, p_i, swing, tau, x_rel, body_y, z_rel, p->x, p->y, p->z);
         // }

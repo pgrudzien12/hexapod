@@ -6,11 +6,12 @@
 #include "robot_config.h"
 
 
-// Joint angles for one leg
+// Joint angles for one leg.
+// Frame conventions:
+//   Body frame: X forward (+), Y left (+), Z up (+)
+//   Leg-local frame: X outward from body (+), Y forward (+), Z up (+)
 typedef struct {
-    // Temporarily repurposed to carry leg-local Cartesian foot targets (x,y,z)
-    // TODO: Rename this structure or add a separate field for Cartesian targets.
-    float joint_angles[3]; // [0]=x_leg, [1]=y_leg, [2]=z_leg
+    float joint_angles[3]; // [0]=coxa yaw (rad), [1]=femur pitch (rad), [2]=tibia (rad)
 } leg_joint_cmd_t;
 
 typedef struct {

@@ -4,17 +4,16 @@
 #include <math.h>
 #include <assert.h>
 #include "esp_log.h"
+#include "esp_timer.h"
 
-// Temporary convention bridging:
-// - swing_trajectory outputs body-frame positions (meters):
-//     X_body: forward (+), Y_body: left (+), Z_body: down (+)
-// - leg IK expects leg-local:
-//     X_leg: outward from body, Y_leg: forward, Z_leg: down (see leg.h)
-// - For now, we don't have per-leg mount rotations/positions; we only mirror left/right:
-//     left legs (0,1,2): X_leg = +Y_body; right legs (3,4,5): X_leg = -Y_body
-//     Y_leg = X_body for all
-//     Z_leg = Z_body for all (already down-positive)
-// TODO: Replace with full per-leg transform using mount poses and yaw angles.
+// Frame bridging:
+// - swing_trajectory outputs body-frame foot targets (meters):
+//     Body: X forward (+), Y left (+), Z up (+)
+// - leg IK expects leg-local frame:
+//     Leg: X outward (+), Y forward (+), Z up (+)
+// - We use per-leg base pose (position + yaw) from robot_config to rotate/translate.
+// - No mirroring hacks remain; yaw handles left/right mounting. Ensure base yaw values
+//   remain +90 deg for left side outward, -90 deg for right side outward in RH frame.
 
 static const char *TAG = "wbc";
 
@@ -65,9 +64,9 @@ void whole_body_control_compute(const swing_trajectory_t *trajectory, whole_body
         if (leg_ik_solve(leg, x_leg, y_leg, z_leg, &q) == ESP_OK) {
             // Store actual joint angles (radians). Order: coxa, femur, tibia.
             // NOTE: Calibration offsets/limits are applied later in robot_control.
-            if (i == 0) {
-                ESP_LOGI(TAG, "Leg %d IK: BodyXYZ(%.3f, %.3f, %.3f) -> LegXYZ(%.3f, %.3f, %.3f) -> LegAng(%.3f, %.3f, %.3f)", i, x_body, y_body, z_body, x_leg, y_leg, z_leg, q.coxa, q.femur, q.tibia);
-            }
+            // if (i != -1) {
+            //     ESP_LOGI(TAG, "(%lld)Leg %d IK: BodyXYZ(%.3f, %.3f, %.3f) -> LegXYZ(%.3f, %.3f, %.3f) -> LegAng(%.3f, %.3f, %.3f)", esp_timer_get_time(), i, x_body, y_body, z_body, x_leg, y_leg, z_leg, q.coxa, q.femur, q.tibia);
+            // }
             cmds->joint_cmds[i].joint_angles[0] = q.coxa;
             cmds->joint_cmds[i].joint_angles[1] = q.femur;
             cmds->joint_cmds[i].joint_angles[2] = q.tibia;
