@@ -10,6 +10,11 @@
 ## 1. Project Overview
 This repository contains firmware for a fully custom 6‑leg (hexapod) walking robot built around an ESP32 using the ESP‑IDF framework. The code implements a modular locomotion stack: user command capture → gait phase scheduling → swing trajectory generation → whole body inverse kinematics → servo actuation. All mechanical parts are custom designed and 3D printed.
 
+Facts:
+- Architecture design inspired by [Efficient gait generation and evaluation for hexapod robots (2024)](https://cjme.springeropen.com/articles/10.1186/s10033-024-01000-0)
+- I burned three ESP32 dev boards during development and counting
+- Project eaten up 2 months of my life up to the first release and working stage
+
 ## 2. Hardware Summary
 * MCU / Control: ESP32 module (classic dual‑core variant) running FreeRTOS via ESP‑IDF
 * Servos: 18 × high‑torque 35 kg.cm hobby servos (3 DOF per leg: coxa yaw, femur pitch, tibia)
