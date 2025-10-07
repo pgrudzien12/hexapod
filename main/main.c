@@ -60,11 +60,11 @@ void gait_framework_main(void *arg)
         // trajectory.desired_positions[0].y = 0.23f;
         // trajectory.desired_positions[0].z = -0.00f;
         whole_body_control_compute(&trajectory, &cmds);
-        for (int i=0;i<NUM_LEGS;++i) {
-            cmds.joint_cmds[i].joint_angles[0] = 0.0f;
-            cmds.joint_cmds[i].joint_angles[1] = 0.0f;
-            cmds.joint_cmds[i].joint_angles[2] = 0.0f;
-        }
+        // for (int i=0;i<NUM_LEGS;++i) {
+        //     cmds.joint_cmds[i].joint_angles[0] = 0.0f;
+        //     cmds.joint_cmds[i].joint_angles[1] = 0.0f;
+        //     cmds.joint_cmds[i].joint_angles[2] = 0.0f;
+        // }
         // Send commands to robot
         robot_execute(&cmds);
 
