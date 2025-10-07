@@ -15,7 +15,7 @@
 static controller_config_t g_cfg = {
     .uart_port = UART_NUM_1,
     .tx_gpio = UART_PIN_NO_CHANGE,
-    .rx_gpio = GPIO_NUM_23,
+    .rx_gpio = GPIO_NUM_22,
     .rts_gpio = UART_PIN_NO_CHANGE,
     .cts_gpio = UART_PIN_NO_CHANGE,
     .baud_rate = 115200,

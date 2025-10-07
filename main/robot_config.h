@@ -42,6 +42,9 @@ typedef struct {
     // MCPWM group per leg (for now one group id per leg; simplest is all 0)
     int mcpwm_group_id[NUM_LEGS];
 
+    // Servo driver selection per joint: 0 = MCPWM, 1 = LEDC (extend later if needed)
+    int servo_driver_sel[NUM_LEGS][3];
+
     // Debug/telemetry controls
     int debug_leg_enable;          // 0/1 to enable leg debugger
     int debug_leg_index;           // which leg to monitor
@@ -83,6 +86,9 @@ int robot_config_get_servo_gpio(int leg_index, leg_servo_t joint);
 
 // MCPWM group id for this leg (default 0).
 int robot_config_get_mcpwm_group(int leg_index);
+
+// Driver selection getter: 0 -> MCPWM, 1 -> LEDC
+int robot_config_get_servo_driver(int leg_index, leg_servo_t joint);
 
 // Debug controls getters
 int robot_config_debug_enabled(void);

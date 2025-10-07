@@ -20,6 +20,7 @@ void robot_config_init_default(void) {
     for (int i = 0; i < NUM_LEGS; ++i) {
         g_cfg.mcpwm_group_id[i] = (i < 3) ? 0 : 1;
         for (int j = 0; j < 3; ++j) g_cfg.servo_gpio[i][j] = -1;
+        for (int j = 0; j < 3; ++j) g_cfg.servo_driver_sel[i][j] = 0; // default MCPWM
     }
     // Rebalance within first three legs: move left-rear leg to group 1 so group 0 only has two legs (6 channels)
     g_cfg.mcpwm_group_id[LEG_LEFT_REAR] = 1;
@@ -35,7 +36,7 @@ void robot_config_init_default(void) {
 
     g_cfg.servo_gpio[LEG_LEFT_REAR][LEG_SERVO_COXA]  = 33;
     g_cfg.servo_gpio[LEG_LEFT_REAR][LEG_SERVO_FEMUR] = 32;
-    g_cfg.servo_gpio[LEG_LEFT_REAR][LEG_SERVO_TIBIA] = 35;
+    g_cfg.servo_gpio[LEG_LEFT_REAR][LEG_SERVO_TIBIA] = 23;
 
     g_cfg.servo_gpio[LEG_RIGHT_FRONT][LEG_SERVO_COXA]  = 15;
     g_cfg.servo_gpio[LEG_RIGHT_FRONT][LEG_SERVO_FEMUR] = 2;
@@ -48,6 +49,14 @@ void robot_config_init_default(void) {
     g_cfg.servo_gpio[LEG_RIGHT_REAR][LEG_SERVO_COXA]  = 18;
     g_cfg.servo_gpio[LEG_RIGHT_REAR][LEG_SERVO_FEMUR] = 19;
     g_cfg.servo_gpio[LEG_RIGHT_REAR][LEG_SERVO_TIBIA] = 21;
+
+    // Driver selection: choose LEDC for the three joints of RIGHT_MIDDLE (leg 4) and LEFT_REAR (leg 2) as example.
+    // Adjust to match pins that are LEDC-friendly if some MCPWM pins (like 32/33/34/35) cause LEDC invalid gpio errors.
+    // For now we move LEDC usage away from GPIO 32/35 which are input-only or restricted on classic ESP32.
+    for (int j = 0; j < 3; ++j) {
+        g_cfg.servo_driver_sel[LEG_RIGHT_MIDDLE][j] = 1; // LEDC
+        g_cfg.servo_driver_sel[LEG_RIGHT_REAR][j] = 1;   // LEDC (example second leg)
+    }
 
     // Default geometry for all 6 legs.
     // NOTE: Units must match usage across the project. Our swing_trajectory uses meters,
@@ -109,7 +118,7 @@ void robot_config_init_default(void) {
     const float YAW_RIGHT   = (float)-M_PI * 0.5f;  // -90 deg
     
     const float QANGLE = (float)M_PI * 0.25f;   // +45 deg
-    const float STD_STANCE_OUT = 0.23f; // meters
+    const float STD_STANCE_OUT = 0.15f; // meters
     const float STD_STANCE_FWD = 0.0f;  // meters
 
     for (int i = 0; i < NUM_LEGS; ++i) {
@@ -189,6 +198,12 @@ int robot_config_get_servo_gpio(int leg_index, leg_servo_t joint) {
 int robot_config_get_mcpwm_group(int leg_index) {
     if (leg_index < 0 || leg_index >= NUM_LEGS) return 0;
     return g_cfg.mcpwm_group_id[leg_index];
+}
+
+int robot_config_get_servo_driver(int leg_index, leg_servo_t joint) {
+    if (leg_index < 0 || leg_index >= NUM_LEGS) return 0;
+    int j = (int)joint; if (j < 0 || j >= 3) return 0;
+    return g_cfg.servo_driver_sel[leg_index][j];
 }
 
 int robot_config_debug_enabled(void) {

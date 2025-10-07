@@ -30,8 +30,8 @@ void gait_framework_main(void *arg)
     user_command_t ucmd;
 
     // Initialize modules with example parameters
-    gait_scheduler_init(&scheduler, 2.f); // 1 second cycle time
-    swing_trajectory_init(&trajectory, 0.06f, 0.03f); // 6cm step, 3cm clearance
+    gait_scheduler_init(&scheduler, 1.5f); // 1.5 second cycle time
+    swing_trajectory_init(&trajectory, 0.07f, 0.04f); // 7cm step, 4cm clearance
     robot_config_init_default();
     // TODO: Calibrate swing_trajectory y/z ranges for your robot; WBC expects meters
     user_command_init();
@@ -42,11 +42,11 @@ void gait_framework_main(void *arg)
         // Read user command (placeholder)
         user_command_poll(&ucmd);
 
-        ucmd.enable = 1; // Force enable for testing
-        ucmd.gait = GAIT_TRIPOD;
-        ucmd.vx = 1.f; 
-        ucmd.z_target = 0.0f; // Mid height
-        ucmd.step_scale = 1.0f; // Medium step length
+        // ucmd.enable = 1; // Force enable for testing
+        // ucmd.gait = GAIT_TRIPOD;
+        // ucmd.vx = 1.f; 
+        // ucmd.z_target = 0.0f; // Mid height
+        // ucmd.step_scale = 1.0f; // Medium step length
 
         // Update gait scheduler (leg phases)
         gait_scheduler_update(&scheduler, dt, &ucmd);
@@ -60,9 +60,11 @@ void gait_framework_main(void *arg)
         // trajectory.desired_positions[0].y = 0.23f;
         // trajectory.desired_positions[0].z = -0.00f;
         whole_body_control_compute(&trajectory, &cmds);
-        // cmds.joint_cmds[0].joint_angles[0] = 0.0f;
-        // cmds.joint_cmds[0].joint_angles[1] = 0.0f;
-        // cmds.joint_cmds[0].joint_angles[2] = scheduler.phase * M_PI/4.0; // test tibia motion
+        for (int i=0;i<NUM_LEGS;++i) {
+            cmds.joint_cmds[i].joint_angles[0] = 0.0f;
+            cmds.joint_cmds[i].joint_angles[1] = 0.0f;
+            cmds.joint_cmds[i].joint_angles[2] = 0.0f;
+        }
         // Send commands to robot
         robot_execute(&cmds);
 
