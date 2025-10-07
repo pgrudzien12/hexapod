@@ -158,10 +158,10 @@ Long-term / Stretch:
 ## 14. License
 This project is licensed under the Apache License, Version 2.0. See the `LICENSE` file at the repository root for the full text.
 
-Include the following notice in derivative works (replace brackets):
+Include the following notice in derivative works:
 
 ```
-Copyright [YEAR] [YOUR NAME]
+Copyright 2025 Paweł Grudzień
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
