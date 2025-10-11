@@ -70,9 +70,8 @@ static void wifi_tcp_client_task(void *arg) {
             ESP_LOGW(TAG, "unsupported version %u", (unsigned)ver);
             break;
         }
-    uint8_t flags = header[3];
-    uint16_t seq = (uint16_t)(header[4] | (header[5] << 8));
-    (void)flags; (void)seq; // currently unused (reserved for future use)
+        uint8_t flags = header[3];
+        uint16_t seq = (uint16_t)(header[4] | (header[5] << 8));
         uint16_t payload_len = (uint16_t)(header[6] | (header[7] << 8));
         if (payload_len != WIFI_CTRL_CHANNEL_BYTES) {
             ESP_LOGW(TAG, "unexpected payload_len=%u", (unsigned)payload_len);
