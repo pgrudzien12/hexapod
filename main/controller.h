@@ -7,18 +7,26 @@
 
 #define CONTROLLER_MAX_CHANNELS 14
 
+// Supported controller input drivers. Only FLYSKY_IBUS implemented initially.
+typedef enum {
+    CONTROLLER_DRIVER_FLYSKY_IBUS = 0, // current default (UART iBUS)
+    CONTROLLER_DRIVER_UART_GENERIC,    // placeholder for simple raw UART protocol
+    CONTROLLER_DRIVER_BT_CLASSIC,      // placeholder
+    CONTROLLER_DRIVER_BT_LE,           // placeholder
+    CONTROLLER_DRIVER_WIFI_TCP,        // placeholder (planned next)
+} controller_driver_type_e;
+
 typedef struct {
-    int uart_port;     // e.g., UART_NUM_1
-    int tx_gpio;       // TX pin
-    int rx_gpio;       // RX pin
-    int rts_gpio;      // or UART_PIN_NO_CHANGE
-    int cts_gpio;      // or UART_PIN_NO_CHANGE
-    int baud_rate;     // e.g., 115200
-    int task_stack;    // e.g., 4096
-    int task_prio;     // e.g., 10
+    controller_driver_type_e driver_type; // selected input driver
+    int task_stack;    // common task stack size (driver may override internally)
+    int task_prio;     // common task priority
+    // Opaque pointer to driver-specific configuration struct (lifetime must outlive controller unless deep copied in future extension)
+    const void *driver_cfg;   // e.g. pointer to controller_flysky_ibus_cfg_t
+    size_t driver_cfg_size;   // size of structure pointed to by driver_cfg (for validation / optional deep copy)
 } controller_config_t;
 
-// Initialize UART task that continuously reads iBUS and updates channel cache
+// Initialize selected controller driver task that updates internal channel cache.
+// Passing NULL uses default configuration (FLYSKY_IBUS driver with built-in UART pins).
 void controller_init(const controller_config_t *cfg);
 
 // Copy latest channel values; returns true if fresh data was available

@@ -36,7 +36,6 @@ void gait_framework_main(void *arg)
     gait_scheduler_init(&scheduler, 1.5f); // 1.5 second cycle time
     swing_trajectory_init(&trajectory, 0.07f, 0.04f); // 7cm step, 4cm clearance
     robot_config_init_default();
-    // TODO: Calibrate swing_trajectory y/z ranges for your robot; WBC expects meters
     user_command_init();
 
     const float dt = 0.01f; // 10ms loop

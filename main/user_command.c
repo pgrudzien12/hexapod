@@ -6,7 +6,8 @@
 static const char* TAG = "user_command";
 
 void user_command_init(void) {
-    // Start controller task with default config; user can change later
+    // Start controller task with default configuration (defaults to FLYSKY iBUS driver);
+    // Future: configuration portal will supply a runtime-selected driver & parameters.
     controller_init(0);
 }
 

@@ -9,5 +9,6 @@ idf_component_register(
     "robot_config.c"
     "user_command.c"
     "controller.c"
+    "controller_flysky_ibus.c"
     INCLUDE_DIRS "."
 )

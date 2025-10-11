@@ -1,31 +1,25 @@
-// FlySky iBUS receiver reader as a reusable module
+// Controller abstraction layer: maintains shared channel state; individual
+// driver implementations (e.g., FlySky iBUS, WiFi TCP, BT) push updates via
+// internal helper functions. This file holds only driver-agnostic logic.
+
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 #include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 #include "freertos/semphr.h"
-#include "driver/uart.h"
-#include "driver/gpio.h"
-#include "sdkconfig.h"
 #include "esp_log.h"
 #include "controller.h"
-#include <math.h>
-
-// Runtime configuration (override via controller_init)
-static controller_config_t g_cfg = {
-    .uart_port = UART_NUM_1,
-    .tx_gpio = UART_PIN_NO_CHANGE,
-    .rx_gpio = GPIO_NUM_22,
-    .rts_gpio = UART_PIN_NO_CHANGE,
-    .cts_gpio = UART_PIN_NO_CHANGE,
-    .baud_rate = 115200,
-    .task_stack = 4096,
-    .task_prio = 10,
-};
 
 static const char *TAG_CTRL = "controller";
 
-#define BUF_SIZE (64)
+// Global runtime configuration (opaque driver_cfg pointer)
+static controller_config_t g_cfg = {
+    .driver_type = CONTROLLER_DRIVER_FLYSKY_IBUS,
+    .task_stack = 4096,
+    .task_prio = 10,
+    .driver_cfg = NULL,
+    .driver_cfg_size = 0,
+};
 
 // | Control                 | Function                  | Notes                         |
 // | ----------------------- | ------------------------- | ----------------------------- |
@@ -43,8 +37,7 @@ static const char *TAG_CTRL = "controller";
 static SemaphoreHandle_t g_ch_mutex;
 static uint16_t g_channels[CONTROLLER_MAX_CHANNELS];
 static volatile uint32_t g_last_update_ms;
-static volatile TickType_t g_last_frame_tick; // last valid iBUS frame tick
-static volatile bool g_connected;             // connection state
+static volatile bool g_connected;             // generic connection state
 
 // Fill default failsafe channels
 static void controller_fill_failsafe(uint16_t out[CONTROLLER_MAX_CHANNELS])
@@ -58,106 +51,84 @@ static void controller_fill_failsafe(uint16_t out[CONTROLLER_MAX_CHANNELS])
     out[5] = 1500; // CH6 Right Vert (unused) neutral
 }
 
-static void controller_task(void *arg)
+// ========== Internal helper API (for driver .c files) ======================
+// To avoid exposing these externally yet, we use forward decls; a later
+// controller_internal.h could formalize them when more drivers arrive.
+bool controller_internal_lock(uint32_t timeout_ms)
 {
-    /* Configure parameters of an UART driver,
-     * communication pins and install the driver */
-    uart_config_t uart_config = {
-        .baud_rate = g_cfg.baud_rate,
-        .data_bits = UART_DATA_8_BITS,
-        .parity    = UART_PARITY_DISABLE,
-        .stop_bits = UART_STOP_BITS_1,
-        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
-        .source_clk = UART_SCLK_DEFAULT,
-    };
-    int intr_alloc_flags = 0;
-
-    ESP_ERROR_CHECK(uart_driver_install(g_cfg.uart_port, 1024, 0, 0, NULL, intr_alloc_flags));
-    ESP_ERROR_CHECK(uart_param_config(g_cfg.uart_port, &uart_config));
-    ESP_ERROR_CHECK(uart_set_pin(g_cfg.uart_port, g_cfg.tx_gpio, g_cfg.rx_gpio, g_cfg.rts_gpio, g_cfg.cts_gpio));
-
-    if (!g_ch_mutex) {
-        g_ch_mutex = xSemaphoreCreateMutex();
-    }
-    uint8_t data[BUF_SIZE];
-
-    while (1) { 
-        // Use a small fixed timeout in ticks to avoid macro issues in static analysis
-        const TickType_t timeout_ticks = 20; // ~20ms if tick=1ms
-        int len = uart_read_bytes(g_cfg.uart_port, data, sizeof(data), timeout_ticks);
-        TickType_t now_tick = xTaskGetTickCount();
-        if (len >= 32) {
-            // look for IBUS frame
-            if (data[0] == 0x20 && data[1] == 0x40) {
-                uint16_t local[CONTROLLER_MAX_CHANNELS];
-                for (int i = 0; i < CONTROLLER_MAX_CHANNELS; i++) {
-                    local[i] = (uint16_t)(data[2 + i*2] | (data[3 + i*2] << 8));
-                }
-                if (xSemaphoreTake(g_ch_mutex, 5) == pdTRUE) {
-                    memcpy(g_channels, local, sizeof(local));
-                    g_last_update_ms = (uint32_t)now_tick;
-                    xSemaphoreGive(g_ch_mutex);
-                }
-                // mark connection alive
-                g_last_frame_tick = now_tick;
-                if (!g_connected) {
-                    g_connected = true;
-                    ESP_LOGI(TAG_CTRL, "iBUS connected (UART%d RX=%d TX=%d)", (int)g_cfg.uart_port, (int)g_cfg.rx_gpio, (int)g_cfg.tx_gpio);
-                }
-                // ESP_LOGD(TAG, "CH1=%u CH2=%u CH3=%u CH4=%u CH5=%u CH6=%u CH7=%u CH8=%u CH9=%u CH10=%u CH11=%u CH12=%u CH13=%u CH14=%u",
-                //          local[0], local[1], local[2], local[3], local[4], local[5], local[6], local[7], local[8], local[9], local[10], local[11], local[12], local[13]);
-            }
-        } else if (len < 0) {
-            // Read error: keep last state, we'll rely on timeout handling below
-        }
-        // Connection timeout handling: if no valid frames for > 1s, declare disconnected and set failsafe
-        TickType_t dt = now_tick - g_last_frame_tick;
-        if (g_connected && dt > pdMS_TO_TICKS(1000)) {
-            g_connected = false;
-            uint32_t ms = (uint32_t)(dt * portTICK_PERIOD_MS);
-            ESP_LOGW(TAG_CTRL, "iBUS disconnected: no frames for %u ms, entering failsafe", (unsigned)ms);
-            uint16_t local[CONTROLLER_MAX_CHANNELS];
-            controller_fill_failsafe(local);
-            if (xSemaphoreTake(g_ch_mutex, 5) == pdTRUE) {
-                memcpy(g_channels, local, sizeof(local));
-                g_last_update_ms = (uint32_t)now_tick;
-                xSemaphoreGive(g_ch_mutex);
-            }
-        }
-    }
-    // CH1 - RIGHT stick, sideways - 
-    // CH2 - LEFT stick, updown - Z
-    // CH3 - RIGHT stick, updown - Z
-    // CH4 - LEFT stick, sideways - X
-    // CH5 - SWA
-    // CH6 - RIGHT stick, updown - dont use
-    // CH7 - SWB
-    // CH8 - SWC
-    // CH9 - SWD
-    // CH10 - VRA
+    if (!g_ch_mutex) return false;
+    return xSemaphoreTake(g_ch_mutex, pdMS_TO_TICKS(timeout_ms)) == pdTRUE;
 }
+
+void controller_internal_unlock(void)
+{
+    if (g_ch_mutex) xSemaphoreGive(g_ch_mutex);
+}
+
+void controller_internal_set_connected(bool connected)
+{
+    g_connected = connected;
+}
+
+bool controller_internal_is_connected(void)
+{
+    return g_connected;
+}
+
+void controller_internal_update_channels(const uint16_t *src)
+{
+    if (!src) return;
+    if (!g_ch_mutex) return;
+    if (xSemaphoreTake(g_ch_mutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+        memcpy(g_channels, src, sizeof(uint16_t)*CONTROLLER_MAX_CHANNELS);
+        g_last_update_ms = (uint32_t)xTaskGetTickCount();
+        xSemaphoreGive(g_ch_mutex);
+    }
+}
+
+void controller_internal_set_failsafe(void)
+{
+    uint16_t tmp[CONTROLLER_MAX_CHANNELS];
+    controller_fill_failsafe(tmp);
+    controller_internal_update_channels(tmp);
+}
+
+const controller_config_t *controller_internal_get_config(void) { return &g_cfg; }
+const void *controller_internal_get_driver_cfg(size_t *out_size)
+{
+    if (out_size) *out_size = g_cfg.driver_cfg_size;
+    return g_cfg.driver_cfg;
+}
+
+// Forward declaration of implemented driver init functions
+void controller_driver_init_flysky_ibus(const controller_config_t *cfg);
 
 void controller_init(const controller_config_t *cfg)
 {
     if (cfg) {
-        g_cfg = *cfg;
+        g_cfg.driver_type = cfg->driver_type;
+        g_cfg.task_stack = cfg->task_stack;
+        g_cfg.task_prio = cfg->task_prio;
+        g_cfg.driver_cfg = cfg->driver_cfg;
+        g_cfg.driver_cfg_size = cfg->driver_cfg_size;
     }
-
+    if (!g_ch_mutex) {
+        g_ch_mutex = xSemaphoreCreateMutex();
+    }
     controller_fill_failsafe(g_channels);
-    xTaskCreate(controller_task, "controller_task", g_cfg.task_stack, NULL, g_cfg.task_prio, NULL);
+    switch (g_cfg.driver_type) {
+        case CONTROLLER_DRIVER_FLYSKY_IBUS:
+        default:
+            controller_driver_init_flysky_ibus(&g_cfg);
+            break;
+    }
 }
 
 bool controller_get_channels(uint16_t out[CONTROLLER_MAX_CHANNELS])
 {
-    if (!out) {
-        return false;
-    }
-    if (!g_ch_mutex) {
-        return false;
-    }
-    if (xSemaphoreTake(g_ch_mutex, 5) != pdTRUE) {
-        return false;
-    }
+    if (!out) return false;
+    if (!g_ch_mutex) return false;
+    if (xSemaphoreTake(g_ch_mutex, pdMS_TO_TICKS(5)) != pdTRUE) return false;
     memcpy(out, g_channels, sizeof(uint16_t) * CONTROLLER_MAX_CHANNELS);
     xSemaphoreGive(g_ch_mutex);
     return true;

@@ -127,6 +127,7 @@ Short-term:
 * Parameterize trajectory scaling (y range, height limits) via runtime configuration.
 
 Mid-term:
+* Modular controller input abstraction (initial implementation complete: FlySky iBUS driver + pluggable architecture for WiFi / BT).
 * Web-based configuration interface (inspired by Betaflight) for tuning: servo calibration, gait parameters, stance geometry, safety thresholds.
 * Persistent storage (NVS) for robot configuration instead of static initialization.
 * Enhanced turning support: integrate yaw rate (`wz`) into per-leg lateral/forward offsets.
@@ -146,6 +147,8 @@ Long-term / Stretch:
 * `main/robot_config.*` – Central configuration: geometry, calibration, mounts, driver selection.
 * `main/leg.*` – Pure kinematic leg model & IK solver.
 * `main/controller.*` – RC receiver (iBUS) decoding & normalization.
+* `main/controller_flysky_ibus.c` – FlySky iBUS driver (UART task) feeding abstraction.
+* `main/controller_internal.h` – Internal helpers for controller drivers.
 * `main/user_command.*` – Aggregates controller state into locomotion command.
 
 ## 12. Getting Started (Build & Flash)
@@ -159,6 +162,26 @@ Long-term / Stretch:
 * Adjust leg geometry: change lengths in `leg_config_t` initialization before calling `leg_configure()`.
 * Tune servo mappings: update `joint_calib_t` ranges & neutral offsets in `robot_config_init_default()`.
 * Add new gait: extend `gait_type_t`, expand switch in `gait_scheduler_update()` and adapt `swing_trajectory_generate()` for phase offset logic.
+
+### Controller Abstraction & Future Runtime Swapping
+
+The controller layer now provides a driver abstraction. Key points:
+
+* Each driver spins a FreeRTOS task ingesting raw input (UART, TCP socket, Bluetooth) then updates a shared channel array guarded by a mutex.
+* Existing APIs `controller_get_channels()` and `controller_decode()` remain stable; locomotion stack is transport‑agnostic.
+* Failsafe injects neutral channels when a driver times out or disconnects.
+* Current driver: FlySky iBUS over UART (default). Upcoming: WiFi TCP driver enabling a Betaflight‑style web configuration portal to stream channel values without reflashing.
+* Opaque driver configuration: `controller_config_t` now holds a `driver_cfg` pointer + size. Each driver defines its own POD struct (e.g. `controller_flysky_ibus_cfg_t`). This allows adding WiFi / BT specific parameters without bloating a shared union. Memory ownership currently stays with the caller (static/global allocation recommended); future enhancement may deep‑copy into internal storage / NVS.
+* Developer guide for writing new drivers: see `CONTROLLER_DRIVERS.md`.
+* Planned WiFi packet draft:
+
+```
+Header: 0xAA 0x55
+Payload: 14 x uint16_t (1000..2000) little-endian
+CRC16 (optional)
+```
+
+Runtime selection (future): store selected driver + params (e.g. WiFi port, BT service UUID) in NVS, applied at boot so firmware can remain static while changing control sources from the portal.
 
 ## 14. License
 This project is licensed under the Apache License, Version 2.0. See the `LICENSE` file at the repository root for the full text.
