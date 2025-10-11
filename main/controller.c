@@ -220,3 +220,31 @@ void controller_decode(const uint16_t ch[CONTROLLER_MAX_CHANNELS], controller_st
     vra = (vra > 2000) ? 2000 : vra;
     out->sra_knob = ((float)vra - 1000.0f) / 1000.0f;
 }
+
+static inline bool float_eq_eps(float a, float b, float eps)
+{
+    float d = a - b;
+    if (d < 0.0f) d = -d;
+    return d <= eps;
+}
+
+bool controller_user_command_equal(const user_command_t *a, const user_command_t *b, float tol)
+{
+    if (a == b) {
+        return true; // covers both NULL and same pointer
+    }
+    if (!a || !b) {
+        return false;
+    }
+    float eps = (tol > 0.0f) ? tol : CONTROLLER_CMD_FLOAT_EPSILON;
+    if (!float_eq_eps(a->vx, b->vx, eps)) return false;
+    if (!float_eq_eps(a->wz, b->wz, eps)) return false;
+    if (!float_eq_eps(a->z_target, b->z_target, eps)) return false;
+    if (!float_eq_eps(a->y_offset, b->y_offset, eps)) return false;
+    if (!float_eq_eps(a->step_scale, b->step_scale, eps)) return false;
+    if (a->gait != b->gait) return false;
+    if (a->enable != b->enable) return false;
+    if (a->pose_mode != b->pose_mode) return false;
+    if (a->terrain_climb != b->terrain_climb) return false;
+    return true;
+}

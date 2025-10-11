@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "user_command.h" // for user_command_t comparison helper
 
 #define CONTROLLER_MAX_CHANNELS 14
 
@@ -46,5 +47,17 @@ typedef struct {
 
 // Convert raw channel u16 into normalized controller_state
 void controller_decode(const uint16_t ch[CONTROLLER_MAX_CHANNELS], controller_state_t *out);
+
+// Default epsilon for float field comparison in user_command comparison helper
+#ifndef CONTROLLER_CMD_FLOAT_EPSILON
+#define CONTROLLER_CMD_FLOAT_EPSILON 1e-2f
+#endif
+
+// Compare two user_command_t structures field-by-field.
+// Floating point members are considered equal if their absolute difference
+// is <= (tol > 0 ? tol : CONTROLLER_CMD_FLOAT_EPSILON).
+// Returns true if both commands are equivalent under these rules.
+// If both pointers are NULL returns true; if only one is NULL returns false.
+bool controller_user_command_equal(const user_command_t *a, const user_command_t *b, float tol);
 
 #endif // CONTROLLER_H
