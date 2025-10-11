@@ -11,11 +11,12 @@ Core separation:
 
 ## 2. Channel Semantics
 
-`CONTROLLER_MAX_CHANNELS` = 14 (aligned with FlySky iBUS). Each channel is a 16‑bit value, usually in the 1000–2000 microsecond RC pulse semantic. New drivers should either:
-1. Provide values already scaled to that nominal range; or
-2. Map their native units (e.g. joystick -32768..32767) into 1000..2000 using a linear transform.
+`CONTROLLER_MAX_CHANNELS` = 32. Each channel is a signed 16‑bit value in the full range -32768..32767. Drivers should:
+1. Produce values already in this symmetric range (e.g. joystick axes, virtual inputs), OR
+2. Map their native transport units into this range using a linear transform.
 
-Maintain consistency so decoding logic (deadband, normalization) doesn’t need per-driver conditionals.
+FlySky iBUS (1000..2000) is internally rescaled to this signed range for the first 14 channels; remaining channels are zeroed.
+Maintain consistency so decoding logic (deadband, normalization) remains transport‑agnostic.
 
 ## 3. Driver Task Lifecycle
 
@@ -69,15 +70,16 @@ When designing a new protocol (e.g., WiFi TCP):
 Recommended frame layout:
 ```
 Bytes 0-1: Sync/Header (0xAA 0x55)
-Bytes 2-29: 14 × uint16_t little-endian channels
-Bytes 30-31: (Optional) CRC16-CCITT over bytes 2..29
+Bytes 2-?: 32 × int16_t little-endian channels (64 bytes) OR a truncated subset (e.g., 16) if bandwidth constrained.
+Bytes N..N+1: (Optional) CRC16-CCITT over payload.
 ```
-Total: 32 bytes (or 30 without CRC). Keep frame short for low latency.
+Example compact profile: 1 header (2 bytes) + 32 channels (64 bytes) + CRC (2 bytes) = 68 bytes.
+If only 14 or 16 channels needed, you may still transmit all 32 with zeros for unused to keep framing simple.
 
 Validation steps:
 1. Search stream for sync pattern.
 2. Verify remaining bytes available; if using CRC, compute and compare.
-3. Channels outside [800, 2200] are clamped to [1000, 2000] (or reject frame) to maintain sanitation.
+3. Channels outside signed int16 range (should not happen) are saturated; higher-level semantic validation can clamp further.
 
 For BLE: Consider using a fixed-length characteristic (e.g. 32 bytes) for atomic notifications.
 

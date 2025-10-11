@@ -12,7 +12,7 @@ extern "C" {
 
 bool controller_internal_lock(uint32_t timeout_ms);
 void controller_internal_unlock(void);
-void controller_internal_update_channels(const uint16_t *src);
+void controller_internal_update_channels(const int16_t *src);
 void controller_internal_set_failsafe(void);
 void controller_internal_set_connected(bool connected);
 bool controller_internal_is_connected(void);

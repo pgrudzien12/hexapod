@@ -35,20 +35,15 @@ static controller_config_t g_cfg = {
 
 
 static SemaphoreHandle_t g_ch_mutex;
-static uint16_t g_channels[CONTROLLER_MAX_CHANNELS];
+static int16_t g_channels[CONTROLLER_MAX_CHANNELS];
 static volatile uint32_t g_last_update_ms;
 static volatile bool g_connected;             // generic connection state
 
 // Fill default failsafe channels
-static void controller_fill_failsafe(uint16_t out[CONTROLLER_MAX_CHANNELS])
+static void controller_fill_failsafe(int16_t out[CONTROLLER_MAX_CHANNELS])
 {
-    for (int i = 0; i < CONTROLLER_MAX_CHANNELS; ++i) out[i] = 1000; // default low
-    // Sticks neutral 1500 except CH3 Right Vert = 1000
-    out[0] = 1500; // CH1 Right Horiz
-    out[1] = 1500; // CH2 Left Vert
-    // CH3 stays 1000
-    out[3] = 1500; // CH4 Left Horiz
-    out[5] = 1500; // CH6 Right Vert (unused) neutral
+    // Neutral (center) = 0 for all axes; switches off (0); gait selection default later in decode.
+    for (int i = 0; i < CONTROLLER_MAX_CHANNELS; ++i) out[i] = 0;
 }
 
 // ========== Internal helper API (for driver .c files) ======================
@@ -75,12 +70,12 @@ bool controller_internal_is_connected(void)
     return g_connected;
 }
 
-void controller_internal_update_channels(const uint16_t *src)
+void controller_internal_update_channels(const int16_t *src)
 {
     if (!src) return;
     if (!g_ch_mutex) return;
     if (xSemaphoreTake(g_ch_mutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-        memcpy(g_channels, src, sizeof(uint16_t)*CONTROLLER_MAX_CHANNELS);
+        memcpy(g_channels, src, sizeof(int16_t)*CONTROLLER_MAX_CHANNELS);
         g_last_update_ms = (uint32_t)xTaskGetTickCount();
         xSemaphoreGive(g_ch_mutex);
     }
@@ -88,7 +83,7 @@ void controller_internal_update_channels(const uint16_t *src)
 
 void controller_internal_set_failsafe(void)
 {
-    uint16_t tmp[CONTROLLER_MAX_CHANNELS];
+    int16_t tmp[CONTROLLER_MAX_CHANNELS];
     controller_fill_failsafe(tmp);
     controller_internal_update_channels(tmp);
 }
@@ -124,29 +119,22 @@ void controller_init(const controller_config_t *cfg)
     }
 }
 
-bool controller_get_channels(uint16_t out[CONTROLLER_MAX_CHANNELS])
+bool controller_get_channels(int16_t out[CONTROLLER_MAX_CHANNELS])
 {
     if (!out) return false;
     if (!g_ch_mutex) return false;
     if (xSemaphoreTake(g_ch_mutex, pdMS_TO_TICKS(5)) != pdTRUE) return false;
-    memcpy(out, g_channels, sizeof(uint16_t) * CONTROLLER_MAX_CHANNELS);
+    memcpy(out, g_channels, sizeof(int16_t) * CONTROLLER_MAX_CHANNELS);
     xSemaphoreGive(g_ch_mutex);
     return true;
 }
 
-static float map_ibus_norm(uint16_t v)
+static float map_signed_norm(int16_t v)
 {
-    // clamp helper to avoid any indentation warnings
-    uint16_t vv;
-    if (v < 1000) {
-        vv = 1000;
-    } else if (v > 2000) {
-        vv = 2000;
-    } else {
-        vv = v;
-    }
-    float f = ((float)vv - 1500.0f) / 500.0f; // -1..+1
-    return f;
+    // Map int16 full scale to -1..+1 (symmetric). INT16_MIN maps to -1, INT16_MAX to +1.
+    if (v <= -32768) return -1.0f;
+    if (v >= 32767) return 1.0f;
+    return (float)v / 32767.0f;
 }
 
 // Linear deadband with range preservation
@@ -161,7 +149,7 @@ static float apply_deadband(float v, float d)
     return s * o;
 }
 
-void controller_decode(const uint16_t ch[CONTROLLER_MAX_CHANNELS], controller_state_t *out)
+void controller_decode(const int16_t ch[CONTROLLER_MAX_CHANNELS], controller_state_t *out)
 {
     if (!ch || !out) {
         return;
@@ -170,26 +158,30 @@ void controller_decode(const uint16_t ch[CONTROLLER_MAX_CHANNELS], controller_st
     // TODO: Make DEAD_BAND configurable via Kconfig or runtime configuration
     const float DEAD_BAND = 0.04f; // ~4%
 
-    out->right_horiz = apply_deadband(map_ibus_norm(ch[0]), DEAD_BAND); // CH1: Right Horiz -> lateral shift
-    out->left_vert   = apply_deadband(map_ibus_norm(ch[1]), DEAD_BAND); // CH2: Left Vert -> forward speed
-    out->right_vert  = apply_deadband(map_ibus_norm(ch[2]), DEAD_BAND); // CH3: Right Vert -> z_target
-    out->left_horiz  = apply_deadband(map_ibus_norm(ch[3]), DEAD_BAND); // CH4: Left Horiz -> yaw rate
-    out->swa_arm  = ch[4] > 1500;            // CH5: SWA
-    out->swb_pose = ch[6] > 1500;            // CH7: SWB
-    // CH8 three-position to gait
-    if (ch[7] < 1300) {
+    out->right_horiz = apply_deadband(map_signed_norm(ch[0]), DEAD_BAND); // CH1: Right Horiz -> lateral shift
+    out->left_vert   = apply_deadband(map_signed_norm(ch[1]), DEAD_BAND); // CH2: Left Vert -> forward speed
+    out->right_vert  = apply_deadband(map_signed_norm(ch[2]), DEAD_BAND); // CH3: Right Vert -> z_target
+    out->left_horiz  = apply_deadband(map_signed_norm(ch[3]), DEAD_BAND); // CH4: Left Horiz -> yaw rate
+
+    // Switch style channels now treated as signed int16 where positive => true.
+    out->swa_arm  = ch[4] > 0;            // CH5: SWA
+    out->swb_pose = ch[6] > 0;            // CH7: SWB
+
+    // Gait selection from CH8: map ranges of signed value to modes.
+    // Use thirds: [-32768,-10923] TRIPOD, (-10923,10923] RIPPLE, (10923,32767] WAVE.
+    int16_t gsel = ch[7];
+    if (gsel <= -10923) {
         out->swc_gait = GAIT_MODE_TRIPOD;
-    } else if (ch[7] < 1700) {
+    } else if (gsel <= 10923) {
         out->swc_gait = GAIT_MODE_RIPPLE;
     } else {
         out->swc_gait = GAIT_MODE_WAVE;
     }
-    out->swd_terrain = ch[8] > 1500;         // CH9: SWD
-    // CH10: VRA 0..1
-    uint16_t vra = ch[9];
-    vra = (vra < 1000) ? 1000 : vra;
-    vra = (vra > 2000) ? 2000 : vra;
-    out->sra_knob = ((float)vra - 1000.0f) / 1000.0f;
+    out->swd_terrain = ch[8] > 0;         // CH9: SWD
+
+    // Knob (CH10): map -32768..32767 to 0..1
+    int16_t raw = ch[9];
+    out->sra_knob = ((float)raw + 32768.0f) / 65535.0f; // map full signed to 0..1
 }
 
 static inline bool float_eq_eps(float a, float b, float eps)

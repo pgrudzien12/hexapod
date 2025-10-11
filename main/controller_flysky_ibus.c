@@ -8,13 +8,14 @@
 #include "esp_log.h"
 #include "controller_internal.h"
 #include "controller_flysky_ibus.h"
+#include <math.h>
 
 #define IBUS_BUF_SIZE 64
 static const char *TAG = "ctrl_flysky_ibus";
 
 static void flysky_task(void *arg)
 {
-    const controller_config_t *cfg_base = controller_internal_get_config();
+    (void)controller_internal_get_config(); // currently unused core params
     // Attempt to fetch driver specific config, else fall back to internal defaults
     controller_flysky_ibus_cfg_t local_cfg;
     const controller_flysky_ibus_cfg_t *cfg_drv = NULL;
@@ -50,10 +51,23 @@ static void flysky_task(void *arg)
         TickType_t now_tick = xTaskGetTickCount();
         if (len >= 32) {
             if (data[0] == 0x20 && data[1] == 0x40) {
-                uint16_t local[CONTROLLER_MAX_CHANNELS];
-                for (int i = 0; i < CONTROLLER_MAX_CHANNELS; ++i) {
-                    local[i] = (uint16_t)(data[2 + i*2] | (data[3 + i*2] << 8));
+                int16_t local[CONTROLLER_MAX_CHANNELS];
+                // First 14 channels from iBUS (or as many as frame provides)
+                for (int i = 0; i < 14 && i < CONTROLLER_MAX_CHANNELS; ++i) {
+                    uint16_t raw = (uint16_t)(data[2 + i*2] | (data[3 + i*2] << 8)); // 1000..2000 typical
+                    if (raw < 1000) raw = 1000;
+                    if (raw > 2000) raw = 2000;
+                    // Scale 1000..2000 -> -32768..32767
+                    // normalized = (raw-1500)/500 => -1..1 then *32767
+                    float norm = ((float)raw - 1500.0f) / 500.0f; // -1..+1
+                    if (norm < -1.0f) norm = -1.0f;
+                    if (norm > 1.0f) norm = 1.0f;
+                    int32_t sv = (int32_t)lrintf(norm * 32767.0f);
+                    if (sv < -32768) sv = -32768;
+                    if (sv > 32767) sv = 32767;
+                    local[i] = (int16_t)sv;
                 }
+                for (int i = 14; i < CONTROLLER_MAX_CHANNELS; ++i) local[i] = 0;
                 controller_internal_update_channels(local);
                 last_frame_tick = now_tick;
                 if (!controller_internal_is_connected()) {

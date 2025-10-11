@@ -13,7 +13,7 @@ void user_command_init(void) {
 
 void user_command_poll(user_command_t *cmd) {
     if (!cmd) return; 
-    uint16_t ch[CONTROLLER_MAX_CHANNELS] = {0};
+    int16_t ch[CONTROLLER_MAX_CHANNELS] = {0};
     controller_state_t st = {0};
     if (controller_get_channels(ch)) {
         controller_decode(ch, &st);

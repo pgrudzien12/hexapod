@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include "user_command.h" // for user_command_t comparison helper
 
-#define CONTROLLER_MAX_CHANNELS 14
+#define CONTROLLER_MAX_CHANNELS 32
 
 // Supported controller input drivers. Only FLYSKY_IBUS implemented initially.
 typedef enum {
@@ -29,8 +29,8 @@ typedef struct {
 // Passing NULL uses default configuration (FLYSKY_IBUS driver with built-in UART pins).
 void controller_init(const controller_config_t *cfg);
 
-// Copy latest channel values; returns true if fresh data was available
-bool controller_get_channels(uint16_t out[CONTROLLER_MAX_CHANNELS]);
+// Copy latest raw channel values (signed -32768..32767). Returns true on success.
+bool controller_get_channels(int16_t out[CONTROLLER_MAX_CHANNELS]);
 
 // Helpers to map channels to logical controls
 typedef enum {
@@ -53,8 +53,9 @@ typedef struct {
     float sra_knob;    // CH10 0..1
 } controller_state_t;
 
-// Convert raw channel u16 into normalized controller_state
-void controller_decode(const uint16_t ch[CONTROLLER_MAX_CHANNELS], controller_state_t *out);
+// Convert raw signed channels into normalized controller_state
+// Stick channels assumed approximately linear in -32768..32767.
+void controller_decode(const int16_t ch[CONTROLLER_MAX_CHANNELS], controller_state_t *out);
 
 // Default epsilon for float field comparison in user_command comparison helper
 #ifndef CONTROLLER_CMD_FLOAT_EPSILON

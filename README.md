@@ -167,11 +167,11 @@ Long-term / Stretch:
 
 The controller layer now provides a driver abstraction. Key points:
 
-* Each driver spins a FreeRTOS task ingesting raw input (UART, TCP socket, Bluetooth) then updates a shared channel array guarded by a mutex.
+* Each driver spins a FreeRTOS task ingesting raw input (UART, TCP socket, Bluetooth) then updates a shared signed channel array (32 × int16_t, range -32768..32767) guarded by a mutex.
 * Existing APIs `controller_get_channels()` and `controller_decode()` remain stable; locomotion stack is transport‑agnostic.
-* Failsafe injects neutral channels when a driver times out or disconnects.
-* Current driver: FlySky iBUS over UART (default). Upcoming: WiFi TCP driver enabling a Betaflight‑style web configuration portal to stream channel values without reflashing.
-* Opaque driver configuration: `controller_config_t` now holds a `driver_cfg` pointer + size. Each driver defines its own POD struct (e.g. `controller_flysky_ibus_cfg_t`). This allows adding WiFi / BT specific parameters without bloating a shared union. Memory ownership currently stays with the caller (static/global allocation recommended); future enhancement may deep‑copy into internal storage / NVS.
+* Failsafe injects neutral (zero) channels when a driver times out or disconnects.
+* Current driver: FlySky iBUS over UART (default) – its 1000..2000 values are rescaled into full signed range for first 14 slots; remaining slots zero.
+* Opaque driver configuration: `controller_config_t` holds a `driver_cfg` pointer + size (e.g. `controller_flysky_ibus_cfg_t`). This keeps core lean while enabling WiFi / BT specific parameters. Memory ownership is with caller.
 * Developer guide for writing new drivers: see `CONTROLLER_DRIVERS.md`.
 * Planned WiFi packet draft:
 
