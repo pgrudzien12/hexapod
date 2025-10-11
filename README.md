@@ -171,15 +171,13 @@ The controller layer now provides a driver abstraction. Key points:
 * Existing APIs `controller_get_channels()` and `controller_decode()` remain stable; locomotion stack is transport‑agnostic.
 * Failsafe injects neutral (zero) channels when a driver times out or disconnects.
 * Current driver: FlySky iBUS over UART (default) – its 1000..2000 values are rescaled into full signed range for first 14 slots; remaining slots zero.
+* WiFi TCP driver (added): versioned binary frame (74 bytes) with sync (AA55), header, 32 signed channels, CRC16.
+	* Detailed spec: see `WIFI_TCP_PROTOCOL.md`.
+	* Current network mode: AP-only for simplicity (see `WIFI_NETWORK_MODES.md` for evolution plan to AP+STA).
+	* AP SSID generation supports fixed, MAC-suffix, or random-suffix modes (default = MAC suffix, e.g. `HEXAPOD_AP_3AF2B7`).
 * Opaque driver configuration: `controller_config_t` holds a `driver_cfg` pointer + size (e.g. `controller_flysky_ibus_cfg_t`). This keeps core lean while enabling WiFi / BT specific parameters. Memory ownership is with caller.
 * Developer guide for writing new drivers: see `CONTROLLER_DRIVERS.md`.
-* Planned WiFi packet draft:
-
-```
-Header: 0xAA 0x55
-Payload: 14 x uint16_t (1000..2000) little-endian
-CRC16 (optional)
-```
+* (Early draft WiFi packet format removed; see `WIFI_TCP_PROTOCOL.md` for the authoritative current definition.)
 
 Runtime selection (future): store selected driver + params (e.g. WiFi port, BT service UUID) in NVS, applied at boot so firmware can remain static while changing control sources from the portal.
 

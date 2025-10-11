@@ -67,14 +67,19 @@ Timeout threshold: 1000 ms is default; adapt (or make configurable) if your tran
 
 When designing a new protocol (e.g., WiFi TCP):
 
-Recommended frame layout:
+Standard WiFi TCP driver frame (Version 1):
 ```
-Bytes 0-1: Sync/Header (0xAA 0x55)
-Bytes 2-?: 32 × int16_t little-endian channels (64 bytes) OR a truncated subset (e.g., 16) if bandwidth constrained.
-Bytes N..N+1: (Optional) CRC16-CCITT over payload.
+Offset Size Field
+0      2    Sync 0xAA 0x55
+2      1    Version (0x01)
+3      1    Flags (bit0: channels present; others reserved)
+4      2    Sequence (uint16 LE)
+6      2    Payload length (expected 64 for 32 * int16)
+8      64   Channels (32 * int16 LE, -32768..32767)
+72     2    CRC16-CCITT over bytes 0..71 (poly 0x1021, init 0xFFFF)
+Total: 74 bytes
 ```
-Example compact profile: 1 header (2 bytes) + 32 channels (64 bytes) + CRC (2 bytes) = 68 bytes.
-If only 14 or 16 channels needed, you may still transmit all 32 with zeros for unused to keep framing simple.
+Frames with unsupported version or wrong length are discarded. CRC mismatch frames are dropped (if configured `require_crc=true`).
 
 Validation steps:
 1. Search stream for sync pattern.

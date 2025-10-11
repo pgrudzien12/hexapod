@@ -18,6 +18,7 @@
 #include "user_command.h"
 #include "controller.h"
 #include <string.h>
+#include "wifi_ap.h"
 
 static const char *TAG = "leg";
 
@@ -70,5 +71,8 @@ void gait_framework_main(void *arg)
 
 void app_main(void)
 {
+    // Bring up WiFi AP early so that network-based controller drivers or diagnostics
+    // can connect even if later initialization stalls. Uses default options (MAC suffix).
+    // wifi_ap_init_once();
     gait_framework_main(NULL);
 }

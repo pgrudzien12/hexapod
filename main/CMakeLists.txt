@@ -10,5 +10,7 @@ idf_component_register(
     "user_command.c"
     "controller.c"
     "controller_flysky_ibus.c"
+    "controller_wifi_tcp.c"
+    "wifi_ap.c"
     INCLUDE_DIRS "."
 )
