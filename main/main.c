@@ -58,7 +58,7 @@ void gait_framework_main(void *arg)
         prev_cmd = ucmd;
         user_command_poll(&ucmd);
         if (!controller_user_command_equal(&prev_cmd, &ucmd, 1e-2f)) {
-            ESP_LOGD(TAG, "User command: vx=%.2f, wz=%.2f, z_target=%.2f, y_offset=%.2f gait=%d enable=%d pose=%d terrain=%d step_scale=%.2f",
+            ESP_LOGI(TAG, "User command: vx=%.2f, wz=%.2f, z_target=%.2f, y_offset=%.2f gait=%d enable=%d pose=%d terrain=%d step_scale=%.2f",
                     ucmd.vx, ucmd.wz, ucmd.z_target, ucmd.y_offset, ucmd.gait, ucmd.enable, ucmd.pose_mode, ucmd.terrain_climb, ucmd.step_scale);
         }
 

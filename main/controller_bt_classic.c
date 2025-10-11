@@ -6,6 +6,8 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
+#include "esp_system.h"
+#include "esp_mac.h"
 
 #include "esp_bt.h"
 #include "esp_bt_main.h"
@@ -32,6 +34,24 @@ static uint32_t g_spp_handle = 0;
 static bool g_connected = false;
 static TickType_t g_last_frame = 0;
 static controller_bt_classic_cfg_t g_config;
+static char g_device_name[32]; // Generated device name buffer
+
+// Generate unique device name based on MAC address
+static void build_device_name(char *out, size_t out_sz, const char *prefix) {
+    if (!out || out_sz == 0) return;
+    
+    uint8_t mac[6];
+    esp_err_t ret = esp_read_mac(mac, ESP_MAC_WIFI_STA);
+    if (ret != ESP_OK) {
+        // Fallback to default if MAC read fails
+        const char *pfx = prefix ? prefix : "HEXAPOD";
+        snprintf(out, out_sz, "%s_DEFAULT", pfx);
+        return;
+    }
+    
+    const char *pfx = prefix ? prefix : "HEXAPOD";
+    snprintf(out, out_sz, "%s_%02X%02X%02X", pfx, mac[3], mac[4], mac[5]);
+}
 
 // CRC16-CCITT (same as WiFi TCP driver)
 static uint16_t crc16_ccitt(const uint8_t *data, size_t len) {
@@ -112,7 +132,7 @@ static void esp_spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t *param) {
         if (param->start.status == ESP_SPP_SUCCESS) {
             ESP_LOGI(TAG, "SPP server started handle:%"PRIu32" scn:%d", 
                     param->start.handle, param->start.scn);
-            esp_bt_gap_set_device_name(g_config.device_name);
+            esp_bt_gap_set_device_name(g_device_name);
             esp_bt_gap_set_scan_mode(ESP_BT_CONNECTABLE, ESP_BT_GENERAL_DISCOVERABLE);
         } else {
             ESP_LOGE(TAG, "SPP start failed: %d", param->start.status);
@@ -198,7 +218,10 @@ void controller_driver_init_bt_classic(const struct controller_config_s *core) {
         g_config = *(const controller_bt_classic_cfg_t*)p;
     }
     
-    ESP_LOGI(TAG, "Initializing BT Classic controller (device: %s)", g_config.device_name);
+    // Generate unique device name
+    build_device_name(g_device_name, sizeof(g_device_name), g_config.device_name_prefix);
+    
+    ESP_LOGI(TAG, "Initializing BT Classic controller (device: %s)", g_device_name);
     
     // Initialize NVS (required for BT)
     ret = nvs_flash_init();
@@ -262,4 +285,8 @@ void controller_driver_init_bt_classic(const struct controller_config_s *core) {
     xTaskCreate(bt_watchdog_task, "bt_watchdog", 2048, NULL, 5, NULL);
     
     ESP_LOGI(TAG, "BT Classic controller ready (PIN: %04"PRIu32")", g_config.pin_code);
+}
+
+const char *controller_bt_get_device_name(void) {
+    return g_device_name[0] ? g_device_name : NULL;
 }
