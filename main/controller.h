@@ -7,13 +7,13 @@
 
 #define CONTROLLER_MAX_CHANNELS 32
 
-// Supported controller input drivers. Implemented: FLYSKY_IBUS, WIFI_TCP.
+// Supported controller input drivers. Only FLYSKY_IBUS implemented initially.
 typedef enum {
     CONTROLLER_DRIVER_FLYSKY_IBUS = 0, // current default (UART iBUS)
     CONTROLLER_DRIVER_UART_GENERIC,    // placeholder for simple raw UART protocol
-    CONTROLLER_DRIVER_BT_CLASSIC,      // placeholder
+    CONTROLLER_DRIVER_BT_CLASSIC,      // Bluetooth Classic SPP
     CONTROLLER_DRIVER_BT_LE,           // placeholder
-    CONTROLLER_DRIVER_WIFI_TCP,        // placeholder (planned next)
+    CONTROLLER_DRIVER_WIFI_TCP,        // WiFi TCP binary protocol
 } controller_driver_type_e;
 
 typedef struct {

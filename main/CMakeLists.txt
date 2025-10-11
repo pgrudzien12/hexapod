@@ -11,6 +11,7 @@ idf_component_register(
     "controller.c"
     "controller_flysky_ibus.c"
     "controller_wifi_tcp.c"
+    "controller_bt_classic.c"
     "wifi_ap.c"
     INCLUDE_DIRS "."
 )

@@ -63,10 +63,14 @@ Failsafe fills channels with deterministic neutral values (center sticks, low th
 
 Timeout threshold: 1000 ms is default; adapt (or make configurable) if your transport expects slower update rates. Keep the threshold generous enough to avoid false negatives but fast enough to trigger safe state quickly.
 
-## 7. Packet / Frame Design Guidelines (Non-UART Examples)
+## 7. Protocol Examples
 
-When designing a new protocol (e.g., WiFi TCP):
+### 7.1 FlySky iBUS (UART)
+- Frame length: 32 bytes (header + 14 channels + checksum)
+- Channel format: uint16_t 1000–2000 range → mapped to signed int16_t
+- Update rate: ~50 Hz
 
+### 7.2 WiFi TCP Binary Protocol
 Standard WiFi TCP driver frame (Version 1):
 ```
 Offset Size Field
@@ -79,16 +83,16 @@ Offset Size Field
 72     2    CRC16-CCITT over bytes 0..71 (poly 0x1021, init 0xFFFF)
 Total: 74 bytes
 ```
-Frames with unsupported version or wrong length are discarded. CRC mismatch frames are dropped (if configured `require_crc=true`).
+Frames with unsupported version or wrong length are discarded. CRC mismatch frames are dropped.
 
-Validation steps:
-1. Search stream for sync pattern.
-2. Verify remaining bytes available; if using CRC, compute and compare.
-3. Channels outside signed int16 range (should not happen) are saturated; higher-level semantic validation can clamp further.
+### 7.3 Bluetooth Classic SPP Protocol
+Uses identical frame format to WiFi TCP (74 bytes) for consistency. See `BLUETOOTH_CLASSIC_PROTOCOL.md` for complete specification including:
+- SPP transport layer details and pairing strategy for no-input devices
+- Fixed PIN authentication (1234 default)
+- Connection management and auto-reconnect behavior
+- Frame parsing and error handling specifics
 
-For BLE: Consider using a fixed-length characteristic (e.g. 32 bytes) for atomic notifications.
-
-## 8. Threading & Concurrency
+## 5. Driver Task Lifecycle
 
 Only the driver task writes channels. Higher layers perform reads via `controller_get_channels()` which acquires the mutex briefly. Keep driver updates <1 kHz to minimize contention (typical RC is 50–200 Hz).
 
