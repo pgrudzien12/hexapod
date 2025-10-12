@@ -26,29 +26,30 @@ void robot_config_init_default(void) {
     g_cfg.mcpwm_group_id[LEG_LEFT_REAR] = 1;
 
     // GPIO assignments by leg index enum
-    g_cfg.servo_gpio[LEG_LEFT_FRONT][LEG_SERVO_COXA]  = 13;
-    g_cfg.servo_gpio[LEG_LEFT_FRONT][LEG_SERVO_FEMUR] = 12;
-    g_cfg.servo_gpio[LEG_LEFT_FRONT][LEG_SERVO_TIBIA] = 14;
 
-    g_cfg.servo_gpio[LEG_LEFT_MIDDLE][LEG_SERVO_COXA]  = 27;
+    g_cfg.servo_gpio[LEG_LEFT_FRONT][LEG_SERVO_COXA]  = 27;
+    g_cfg.servo_gpio[LEG_LEFT_FRONT][LEG_SERVO_FEMUR] = 13;
+    g_cfg.servo_gpio[LEG_LEFT_FRONT][LEG_SERVO_TIBIA] = 12;
+
+    g_cfg.servo_gpio[LEG_LEFT_MIDDLE][LEG_SERVO_COXA]  = 14;
     g_cfg.servo_gpio[LEG_LEFT_MIDDLE][LEG_SERVO_FEMUR] = 26;
     g_cfg.servo_gpio[LEG_LEFT_MIDDLE][LEG_SERVO_TIBIA] = 25;
 
-    g_cfg.servo_gpio[LEG_LEFT_REAR][LEG_SERVO_COXA]  = 33;
+    g_cfg.servo_gpio[LEG_LEFT_REAR][LEG_SERVO_COXA]  = 23;
     g_cfg.servo_gpio[LEG_LEFT_REAR][LEG_SERVO_FEMUR] = 32;
-    g_cfg.servo_gpio[LEG_LEFT_REAR][LEG_SERVO_TIBIA] = 23;
+    g_cfg.servo_gpio[LEG_LEFT_REAR][LEG_SERVO_TIBIA] = 33;
 
-    g_cfg.servo_gpio[LEG_RIGHT_FRONT][LEG_SERVO_COXA]  = 15;
-    g_cfg.servo_gpio[LEG_RIGHT_FRONT][LEG_SERVO_FEMUR] = 2;
-    g_cfg.servo_gpio[LEG_RIGHT_FRONT][LEG_SERVO_TIBIA] = 4;
+    g_cfg.servo_gpio[LEG_RIGHT_FRONT][LEG_SERVO_COXA]  = 5;
+    g_cfg.servo_gpio[LEG_RIGHT_FRONT][LEG_SERVO_FEMUR] = 17;
+    g_cfg.servo_gpio[LEG_RIGHT_FRONT][LEG_SERVO_TIBIA] = 16;
 
-    g_cfg.servo_gpio[LEG_RIGHT_MIDDLE][LEG_SERVO_COXA]  = 16;
-    g_cfg.servo_gpio[LEG_RIGHT_MIDDLE][LEG_SERVO_FEMUR] = 17;
-    g_cfg.servo_gpio[LEG_RIGHT_MIDDLE][LEG_SERVO_TIBIA] = 5;
+    g_cfg.servo_gpio[LEG_RIGHT_MIDDLE][LEG_SERVO_COXA]  = 4;
+    g_cfg.servo_gpio[LEG_RIGHT_MIDDLE][LEG_SERVO_FEMUR] = 2;
+    g_cfg.servo_gpio[LEG_RIGHT_MIDDLE][LEG_SERVO_TIBIA] = 15;
 
-    g_cfg.servo_gpio[LEG_RIGHT_REAR][LEG_SERVO_COXA]  = 18;
+    g_cfg.servo_gpio[LEG_RIGHT_REAR][LEG_SERVO_COXA]  = 21;
     g_cfg.servo_gpio[LEG_RIGHT_REAR][LEG_SERVO_FEMUR] = 19;
-    g_cfg.servo_gpio[LEG_RIGHT_REAR][LEG_SERVO_TIBIA] = 21;
+    g_cfg.servo_gpio[LEG_RIGHT_REAR][LEG_SERVO_TIBIA] = 18;
 
     // Driver selection: choose LEDC for the three joints of RIGHT_MIDDLE (leg 4) and LEFT_REAR (leg 2) as example.
     // Adjust to match pins that are LEDC-friendly if some MCPWM pins (like 32/33/34/35) cause LEDC invalid gpio errors.
@@ -87,6 +88,9 @@ void robot_config_init_default(void) {
             } else {
                 c->invert_sign = 1;
             }
+            // if (i>= LEG_RIGHT_FRONT && j == LEG_SERVO_COXA) {
+            //     c->invert_sign *= -1; // right-side coxa often needs inversion
+            // }
             c->min_rad = (float)-M_PI * 0.5f;
             c->max_rad = (float) M_PI * 0.5f;
             c->pwm_min_us = 500;
