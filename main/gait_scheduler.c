@@ -17,7 +17,7 @@ void gait_scheduler_update(gait_scheduler_t *scheduler, float dt, const user_com
     // Advance phase only when enabled and commanded velocity is non-zero
     // TODO: Consider separate forward/turning components and modulate phase rate by
     //       a base frequency parameter instead of reusing cycle_time directly.
-    if (cmd->enable) {
+    if (cmd->enable && (fabsf(cmd->vx) > 1e-3f || fabsf(cmd->wz) > 1e-3f)) {
         // crude frequency scaling: base 1/cycle_time Hz, scaled by step_scale and |vx|
         float speed = (cmd->vx < 0.0f) ? -cmd->vx : cmd->vx; // use magnitude
         float freq = (scheduler->cycle_time > 0.0f) ? (1.0f / scheduler->cycle_time) : 1.0f;
@@ -28,10 +28,11 @@ void gait_scheduler_update(gait_scheduler_t *scheduler, float dt, const user_com
             scheduler->phase -= 1.0f;
         }
     } else {
-        // hold phase and keep all legs in support when disabled
+        // hold phase and keep all legs in support when disabled or zero speed
         for (int i = 0; i < NUM_LEGS; ++i) {
             scheduler->leg_states[i] = LEG_SUPPORT;
         }
+        scheduler->phase = 0.0f;
         return;
     }
 
