@@ -1,5 +1,6 @@
 idf_component_register(
     SRCS
+    "robot_config_fat.c"
     "main.c"
     "leg.c"
     "gait_scheduler.c"

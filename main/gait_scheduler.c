@@ -1,5 +1,6 @@
 #include "gait_scheduler.h"
 #include "robot_config.h"
+#include <math.h>
 #include <assert.h>
 
 void gait_scheduler_init(gait_scheduler_t *scheduler, float cycle_time) {
