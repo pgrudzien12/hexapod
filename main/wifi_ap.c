@@ -65,7 +65,8 @@ bool wifi_ap_init_with_options(const wifi_ap_options_t *opt) {
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
     wifi_config_t ap_cfg = {0};
     build_ssid(g_active_ssid, sizeof(g_active_ssid), opt);
-    snprintf((char*)ap_cfg.ap.ssid, sizeof(ap_cfg.ap.ssid), "%s", g_active_ssid);
+    strncpy((char*)ap_cfg.ap.ssid, g_active_ssid, sizeof(ap_cfg.ap.ssid) - 1);
+    ap_cfg.ap.ssid[sizeof(ap_cfg.ap.ssid) - 1] = '\0'; // Ensure null-termination
     ap_cfg.ap.ssid_len = 0; // null-terminated
     const char *pass = (opt && opt->password) ? opt->password : WIFI_AP_PASS;
     snprintf((char*)ap_cfg.ap.password, sizeof(ap_cfg.ap.password), "%s", pass);

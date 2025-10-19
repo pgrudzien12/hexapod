@@ -13,7 +13,6 @@ cmake_install.cmake
 Makefile
 
 # Project configuration
-sdkconfig
 sdkconfig.old
 
 # ESP-IDF Python environment
