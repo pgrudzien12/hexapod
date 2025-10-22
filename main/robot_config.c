@@ -63,7 +63,7 @@ void robot_config_init_default(void) {
     // NOTE: Units must match usage across the project. Our swing_trajectory uses meters,
     // so we set lengths in meters as placeholders.
     // TODO(ESP-Storage): Replace with values loaded from storage per leg.
-    const leg_config_t geom = {
+    const leg_geometry_t geom = {
         .len_coxa = 0.068f,  // 68 mm
         .len_femur = 0.088f, // 88 mm
         .len_tibia = 0.127f, // 127 mm

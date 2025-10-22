@@ -21,25 +21,16 @@ static inline float normalize_angle(float angle)
     return angle;
 }
 
-typedef struct leg_s {
-    // Geometry only; no hardware details
-    float len_coxa, len_femur, len_tibia;
-    float coxa_offset_rad, femur_offset_rad, tibia_offset_rad;
-} leg_ctx_t;
-
-esp_err_t leg_configure(const leg_config_t* cfg, leg_handle_t* out_leg)
+esp_err_t leg_configure(const leg_geometry_t* cfg, leg_handle_t* out_leg)
 {
     if (!cfg || !out_leg) return ESP_ERR_INVALID_ARG;
     *out_leg = NULL;
-    leg_ctx_t* leg = (leg_ctx_t*)calloc(1, sizeof(leg_ctx_t));
+    leg_geometry_t* leg = (leg_geometry_t*)calloc(1, sizeof(leg_geometry_t));
     if (!leg) return ESP_ERR_NO_MEM;
-    leg->len_coxa = cfg->len_coxa;
-    leg->len_femur = cfg->len_femur;
-    leg->len_tibia = cfg->len_tibia;
-    leg->coxa_offset_rad = cfg->coxa_offset_rad;
-    leg->femur_offset_rad = cfg->femur_offset_rad;
-    leg->tibia_offset_rad = cfg->tibia_offset_rad;
-    *out_leg = (leg_handle_t)leg;
+    
+    // Copy configuration to allocated structure
+    *leg = *cfg;
+    *out_leg = leg;
     return ESP_OK;
 }
 
@@ -54,7 +45,7 @@ esp_err_t leg_ik_solve(leg_handle_t handle, float x, float y, float z, leg_angle
      * Previous implementation assumed Z down; do NOT reuse old sign assumptions.
      */
     if (!handle || !out_angles) return ESP_ERR_INVALID_ARG;
-    leg_ctx_t* leg = (leg_ctx_t*)handle;
+    leg_geometry_t* leg = handle;
 
     // Coxa yaw in XY plane (unchanged by Z convention change)
     float yaw = normalize_angle(atan2f(y, x));

@@ -13,21 +13,13 @@ extern "C" {
 #endif
 
 // Example usage
-// leg_config_t cfg = {
-//     .gpio_coxa = LEG_SERVO1_GPIO,
-//     .gpio_femur = LEG_SERVO2_GPIO,
-//     .gpio_tibia = LEG_SERVO3_GPIO,
+// leg_geometry_t cfg = {
 //     .len_coxa = 0.068f,
 //     .len_femur = 0.088f,
 //     .len_tibia = 0.1270f,
-//     .group_id = 0,
-//     // Allow tibia to move negative down to -90 deg, with max at +16 deg (both in radians)
-//     .min_rad_tibia = deg_to_rad(-90.0f),
-//     .max_rad_tibia = deg_to_rad(16.0f),
-// // Servo calibration offsets (radians)
-// .coxa_offset_rad = 4*-0.017453292519943295f,
-// .femur_offset_rad = 0.5396943301595464f,
-// .tibia_offset_rad = 1.0160719600939494f,
+//     .coxa_offset_rad = 4*-0.017453292519943295f,
+//     .femur_offset_rad = 0.5396943301595464f,
+//     .tibia_offset_rad = 1.0160719600939494f,
 // };
 
 
@@ -45,12 +37,9 @@ typedef enum {
 	LEG_SERVO_TIBIA = 2,
 } leg_servo_t;
 
-// Opaque leg descriptor
-typedef struct leg_s* leg_handle_t;
-
-// Configuration for a leg's geometry (units up to you, e.g., meters or mm)
-// Note: Hardware/servo pins, limits, and offsets are handled elsewhere (robot_control).
+// Leg geometry and calibration structure (exposed for direct access)
 typedef struct {
+	// Geometry - link lengths in consistent units (meters)
 	float len_coxa;   // distance from hip yaw joint to femur joint along the X axis
 	float len_femur;  // thigh length
 	float len_tibia;  // shank length
@@ -59,10 +48,13 @@ typedef struct {
 	float coxa_offset_rad;
 	float femur_offset_rad;
 	float tibia_offset_rad;
-} leg_config_t;
+} leg_geometry_t;
+
+// Leg handle - now explicit structure pointer instead of opaque
+typedef leg_geometry_t* leg_handle_t;
 
 // Create/configure a leg and return a descriptor via out_leg
-esp_err_t leg_configure(const leg_config_t* cfg, leg_handle_t* out_leg);
+esp_err_t leg_configure(const leg_geometry_t* cfg, leg_handle_t* out_leg);
 
 // IK output angles in radians
 typedef struct {
@@ -77,7 +69,7 @@ typedef struct {
 //  - Z axis points downward (increases toward ground)
 //  - X points outward from the robot body (to the side)
 //  - Y points forward
-// Units for x/y/z should match the leg lengths provided in leg_config_t.
+// Units for x/y/z should match the leg lengths provided in leg_geometry_t.
 // Returns ESP_OK on success and writes angles to out_angles (no clamping/offsets applied).
 esp_err_t leg_ik_solve(leg_handle_t leg, float x, float y, float z, leg_angles_t *out_angles);
 

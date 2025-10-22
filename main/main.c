@@ -20,6 +20,7 @@
 #include <string.h>
 #include "wifi_ap.h"
 #include "controller_bt_classic.h"
+#include "kpp_system.h"
 
 static const char *TAG = "leg";
 
@@ -33,6 +34,12 @@ void gait_framework_main(void *arg)
     user_command_t prev_cmd; // previous command for change detection
     memset(&ucmd, 0, sizeof(ucmd));
     memset(&prev_cmd, 0, sizeof(prev_cmd));
+
+    // Initialize KPP (Kinematic Pose Position) system
+    kinematic_state_t kpp_state;
+    motion_limits_t motion_limits;
+    ESP_ERROR_CHECK(kpp_init(&kpp_state, &motion_limits));
+    ESP_LOGI(TAG, "KPP system initialized with motion limiting enabled");
 
     // Initialize modules with example parameters
     gait_scheduler_init(&scheduler, 1.5f); // 1.5 second cycle time
@@ -68,8 +75,16 @@ void gait_framework_main(void *arg)
         swing_trajectory_generate(&trajectory, &scheduler, &ucmd);
         // Compute joint commands from trajectories
         whole_body_control_compute(&trajectory, &cmds);
-        // Send commands to robot
-        robot_execute(&cmds);
+        
+        // KPP: Apply motion limiting for smooth servo operation
+        whole_body_cmd_t limited_cmds;
+        kpp_apply_limits(&kpp_state, &motion_limits, &cmds, &limited_cmds, dt);
+        
+        // Send limited commands to robot
+        robot_execute(&limited_cmds);
+        
+        // KPP: Update state estimation based on executed commands
+        kpp_update_state(&kpp_state, &limited_cmds, dt);
 
         float time_end = esp_timer_get_time();
         // Calculate how long to wait to maintain dt period
