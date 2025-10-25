@@ -43,6 +43,38 @@ extern "C" {
 // Acceleration estimation filter
 #define KPP_ACCEL_FILTER_ALPHA     0.2f    // More filtering for acceleration
 
+// Leg velocity estimation filter (for position-derived velocities)
+#define KPP_LEG_VELOCITY_FILTER_ALPHA  0.25f  // Slightly more filtering for leg velocities
+
+// Body velocity estimation filter
+#define KPP_BODY_VELOCITY_FILTER_ALPHA 0.2f   // More filtering for body velocity estimates
+
+// Body pose estimation parameters
+#define KPP_BODY_PITCH_FILTER_ALPHA    0.1f   // Heavy filtering for orientation estimates
+#define KPP_BODY_ROLL_FILTER_ALPHA     0.1f   // Heavy filtering for orientation estimates
+
+// Geometric parameters for body pose estimation (meters)
+#define KPP_FRONT_TO_BACK_DISTANCE     0.15f  // Distance from front legs to back legs
+#define KPP_LEFT_TO_RIGHT_DISTANCE     0.12f  // Distance from left legs to right legs
+
+// Velocity validation bounds
+#define KPP_MAX_LEG_VELOCITY           2.0f   // m/s - maximum reasonable leg tip velocity  
+#define KPP_MAX_BODY_VELOCITY          1.0f   // m/s - maximum reasonable body velocity
+#define KPP_MAX_ANGULAR_VELOCITY       5.0f   // rad/s - maximum reasonable angular velocity
+
+// Body pose estimation parameters
+#define KPP_BODY_PITCH_FILTER_ALPHA    0.1f   // Heavy filtering for orientation estimates
+#define KPP_BODY_ROLL_FILTER_ALPHA     0.1f   // Heavy filtering for orientation estimates
+
+// Geometric parameters for body pose estimation (meters)
+#define KPP_FRONT_TO_BACK_DISTANCE     0.15f  // Distance from front legs to back legs
+#define KPP_LEFT_TO_RIGHT_DISTANCE     0.12f  // Distance from left legs to right legs
+
+// Velocity validation bounds
+#define KPP_MAX_LEG_VELOCITY           2.0f   // m/s - maximum reasonable leg tip velocity  
+#define KPP_MAX_BODY_VELOCITY          1.0f   // m/s - maximum reasonable body velocity
+#define KPP_MAX_ANGULAR_VELOCITY       5.0f   // rad/s - maximum reasonable angular velocity
+
 // Minimum time step for numerical differentiation (seconds)
 #define KPP_MIN_DT                 0.001f  // 1ms minimum
 
