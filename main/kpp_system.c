@@ -132,15 +132,48 @@ void kpp_apply_limits(const kinematic_state_t* state, const motion_limits_t* lim
 
 #if KPP_ENABLE_LIMIT_LOGGING
     static int limit_log_counter = 0;
-    if (++limit_log_counter >= KPP_LOG_INTERVAL * 2) {
-        // Log example of limiting effect
-        float desired = desired_cmd->joint_cmds[0].joint_angles[0];
-        float limited = limited_cmd->joint_cmds[0].joint_angles[0];
-        float diff = fabsf(desired - limited);
-        if (diff > 0.01f) { // Only log if significant limiting occurred
-            ESP_LOGD(TAG, "Motion limiting: leg0_coxa desired=%.3f limited=%.3f diff=%.3f", 
-                     desired, limited, diff);
+    static float total_limiting_error = 0.0f;
+    static int significant_limits = 0;
+    
+    if (++limit_log_counter >= KPP_LOG_INTERVAL) {
+        // Calculate total limiting effect across all joints
+        float max_angle_diff = 0.0f;
+        float max_velocity_diff = 0.0f;
+        int limited_joints = 0;
+        
+        for (int leg = 0; leg < NUM_LEGS; leg++) {
+            for (int joint = 0; joint < 3; joint++) {
+                float desired = desired_cmd->joint_cmds[leg].joint_angles[joint];
+                float limited = limited_cmd->joint_cmds[leg].joint_angles[joint];
+                float angle_diff = fabsf(desired - limited);
+                
+                if (angle_diff > 0.01f) { // Significant limiting (>0.57 degrees)
+                    limited_joints++;
+                    if (angle_diff > max_angle_diff) max_angle_diff = angle_diff;
+                    
+                    // Calculate velocity difference this causes
+                    float desired_vel = (desired - state->joint_angles[leg][joint]) / dt;
+                    float limited_vel = (limited - state->joint_angles[leg][joint]) / dt;
+                    float vel_diff = fabsf(desired_vel - limited_vel);
+                    if (vel_diff > max_velocity_diff) max_velocity_diff = vel_diff;
+                }
+            }
         }
+        
+        if (limited_joints > 0) {
+            ESP_LOGI(TAG, "MOTION LIMITING: %d joints limited, max_angle_diff=%.3f rad (%.1f°), max_vel_diff=%.2f rad/s", 
+                     limited_joints, max_angle_diff, max_angle_diff*180.0f/3.14159f, max_velocity_diff);
+            
+            // Log specific example for detailed analysis
+            float leg0_desired = desired_cmd->joint_cmds[0].joint_angles[0];
+            float leg0_limited = limited_cmd->joint_cmds[0].joint_angles[0];
+            float leg0_current = state->joint_angles[0][0];
+            float leg0_current_vel = state->joint_velocities[0][0];
+            
+            ESP_LOGI(TAG, "LEG0_COXA: current=%.3f vel=%.2f | desired=%.3f limited=%.3f diff=%.3f", 
+                     leg0_current, leg0_current_vel, leg0_desired, leg0_limited, leg0_desired - leg0_limited);
+        }
+        
         limit_log_counter = 0;
     }
 #endif

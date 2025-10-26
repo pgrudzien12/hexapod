@@ -15,5 +15,6 @@ idf_component_register(
     "wifi_ap.c"
     "kpp_system.c"
     "kpp_forward_kin.c"
+    "kpp_debug.c"
     INCLUDE_DIRS "."
 )

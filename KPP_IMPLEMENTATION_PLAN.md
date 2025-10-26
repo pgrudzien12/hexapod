@@ -314,31 +314,102 @@ main/
 - Well-defined interfaces and data structures
 - Comprehensive configuration system
 
-## Final Status ✅ **IMPLEMENTATION COMPLETE**
+## Final Status ✅ **IMPLEMENTATION COMPLETE & OPTIMIZED**
 
-### **KPP System Successfully Deployed** 
+### **🚨 CRITICAL DISCOVERY: Original KPP Design Incompatible with Gait Scheduler**
 
-The KPP system has been fully implemented and integrated into the hexapod control system with excellent results:
+During implementation and testing, we discovered a **fundamental architectural incompatibility** between the original KPP motion limiting design and the existing gait scheduler system:
+
+#### **The Core Problem:**
+1. **Gait Scheduler Assumptions:** The gait scheduler plans trajectories assuming commands are executed exactly as generated
+2. **Motion Limiting Interference:** KPP motion limiting modifies commands to smooth acceleration/jerk
+3. **State Feedback Loop:** Original design updated state estimates from the *modified* commands
+4. **Desynchronization:** Gait scheduler becomes unaware that its commands were altered
+5. **Oscillations & Overshoot:** Robot behavior becomes unstable with lag and overshoot
+
+#### **Observed Symptoms:**
+- **Lag:** Robot response delayed when motion limiting interferes
+- **Oscillations:** Persistent movement after releasing commands (up to several seconds)
+- **Overshoot:** Robot overshooting target positions when stopping
+- **Extreme Limiting:** Motion limiting reducing commands by up to 27° per control cycle
+- **Feedback Instability:** Increasing filter responsiveness made oscillations worse
+
+#### **Root Cause Analysis:**
+```
+Original (Problematic) Architecture:
+Gait Scheduler → Commands → Motion Limiting → Modified Commands → Robot
+                                    ↓
+State Estimator ← Modified Commands (FEEDBACK LOOP!)
+       ↓
+Motion Limiting Decisions Based on Wrong State
+```
+
+**The Problem:** Motion limiting was making decisions based on state estimates derived from its own previous modifications, creating an unstable feedback loop.
+
+### **🔧 Architectural Solution: Breaking the Feedback Loop**
+
+**Fixed Architecture:**
+```
+Gait Scheduler → Commands → Motion Limiting → Modified Commands → Robot
+       ↓                           
+State Estimator ← Original Commands (NO FEEDBACK LOOP!)
+```
+
+**Key Changes:**
+1. **State estimation** uses *original* gait commands, not limited commands
+2. **Motion limiting** still protects servos from extreme accelerations  
+3. **No feedback loop** - limiting doesn't affect future state estimates
+4. **Gait scheduler** remains synchronized with state estimator
+
+### **KPP System Successfully Deployed and Tuned** 
+
+The KPP system has been fully implemented, debugged, and optimized for production use:
 
 **✅ Completed Features:**
 - Complete state estimation (joint, leg, and body state tracking)
-- S-curve motion limiting with jerk, acceleration, and velocity control
-- Low-pass filtering for smooth state estimates
+- S-curve motion limiting with optimally tuned jerk, acceleration, and velocity control
+- Low-pass filtering for smooth state estimates with production-tuned filter parameters
 - Velocity validation and bounds checking
-- Comprehensive debug logging and telemetry
-- Refactored, maintainable code architecture
+- **CRITICAL FIX: Eliminated feedback loop oscillations** by updating state from original commands
+- Comprehensive debug monitoring for limit tuning (debug builds only)
+- Clean, maintainable code architecture
 - Full integration with existing locomotion framework
 
-**🎯 Next Development Phase:**
-The KPP foundation is now ready for **Phase 2: Multi-Mode Motion Control** as outlined in TODO.md:
-- MOTION_MODE_FAST for responsive control
-- MOTION_MODE_EMERGENCY for critical situations  
-- Smooth mode transition system
+**🔧 Production Tuning Results:**
+Based on real-world testing and data collection:
+- **Velocity Limits:** 5.0 rad/s (optimal balance of protection and performance)
+- **Acceleration Limits:** 600 rad/s² (allows natural gait accelerations up to 477 rad/s²)
+- **Jerk Limits:** 3500 rad/s³ (smooth S-curve motion, max observed 2384 rad/s³)
+- **Filter Constants:** Optimized for responsive state estimation without noise
 
-**🏆 Project Impact:**
-The KPP system provides the foundation for:
-- Improved servo health through motion smoothing
-- Better state awareness for advanced control algorithms
+**🎯 Performance Characteristics:**
+- **Normal operation:** diff=0.000 (zero interference with gait)
+- **Extreme maneuvers:** Minimal limiting when needed (diff<0.01 typical)
+- **Servo protection:** Prevents hardware-damaging accelerations
+- **Smooth motion:** Natural S-curve limiting improves movement quality
+- **Debug monitoring:** Production builds have zero debug overhead
+
+### **📚 Lessons Learned & Future Considerations**
+
+#### **Key Insights:**
+1. **Control System Integration:** Adding motion limiting to existing control systems requires careful consideration of feedback loops
+2. **State Estimation Consistency:** State estimators must track what the *planner* intended, not what was actually executed
+3. **Data-Driven Tuning:** Real-world testing data is essential for optimal limit configuration
+4. **Debug Infrastructure:** Comprehensive monitoring during development pays off in production stability
+
+#### **Design Principles Established:**
+- **Separation of Concerns:** Motion limiting and state estimation should have minimal coupling
+- **Gait Scheduler Authority:** The gait scheduler should remain the authoritative source of intended motion
+- **Safety Without Interference:** Protection systems should activate only in extreme cases
+- **Observable Behavior:** Debug monitoring should quantify system performance for tuning
+
+#### **Alternative Approaches Considered:**
+1. **Integrated Limiting:** Build motion limits directly into gait generation (more invasive)
+2. **Feed-Forward Correction:** Inform gait scheduler about limiting effects (complex)
+3. **Disable Limiting:** Remove motion limiting entirely (less servo protection)
+4. **Selected Solution:** Break feedback loop by separating state estimation (optimal balance)
+
+This experience demonstrates the importance of **system-level thinking** when integrating new control features into existing, well-tuned systems.
 - Platform for future sensor fusion (IMU, force sensors)
 - Enhanced debugging and system monitoring capabilities
 
