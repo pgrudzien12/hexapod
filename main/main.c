@@ -84,7 +84,7 @@ void gait_framework_main(void *arg)
         robot_execute(&limited_cmds);
         
         // KPP: Update state estimation based on executed commands
-        kpp_update_state(&kpp_state, &limited_cmds, dt);
+        // kpp_update_state(&kpp_state, &limited_cmds, dt);
 
         float time_end = esp_timer_get_time();
         // Calculate how long to wait to maintain dt period
