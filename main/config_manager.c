@@ -18,6 +18,9 @@ static const char *TAG = "config_mgr";
 // Configuration version for migration support
 #define CONFIG_SCHEMA_VERSION 1
 
+// Global configuration version key (stored in system namespace for now)
+#define GLOBAL_CONFIG_VERSION_KEY "global_ver"  // Max 15 chars for NVS
+
 // NVS partition names
 #define NVS_PARTITION_WIFI   "nvs"        // Default ESP-IDF partition for WiFi
 #define NVS_PARTITION_ROBOT  "nvs_robot"  // Custom partition for robot config
@@ -54,59 +57,245 @@ static system_config_t g_system_config = {0};
 #define SYS_KEY_CONFIG_VERSION      "config_ver"
 
 // =============================================================================
-// Helper Functions
+// Global Version Management
 // =============================================================================
+
+static esp_err_t read_global_config_version(uint16_t* version) {
+    nvs_handle_t handle = g_manager_state.nvs_handles[CONFIG_NS_SYSTEM];
+    esp_err_t err = nvs_get_u16(handle, GLOBAL_CONFIG_VERSION_KEY, version);
+    
+    if (err == ESP_ERR_NVS_NOT_FOUND) {
+        *version = 0;  // Fresh partition
+        return ESP_OK;
+    }
+    
+    return err;
+}
+
+static esp_err_t save_global_config_version(uint16_t version) {
+    nvs_handle_t handle = g_manager_state.nvs_handles[CONFIG_NS_SYSTEM];
+    ESP_ERROR_CHECK(nvs_set_u16(handle, GLOBAL_CONFIG_VERSION_KEY, version));
+    ESP_ERROR_CHECK(nvs_commit(handle));
+    return ESP_OK;
+}
+
+// =============================================================================
+// Migration System
+// =============================================================================
+
+static esp_err_t init_system_defaults_to_nvs(void) {
+    nvs_handle_t handle = g_manager_state.nvs_handles[CONFIG_NS_SYSTEM];
+    
+    ESP_LOGI(TAG, "Initializing system namespace defaults to NVS");
+    
+    // Write default values to NVS (will be loaded later)
+    ESP_ERROR_CHECK(nvs_set_u8(handle, SYS_KEY_EMERGENCY_STOP, 1));  // true
+    ESP_ERROR_CHECK(nvs_set_u32(handle, SYS_KEY_AUTO_DISARM_TIMEOUT, 30));
+    ESP_ERROR_CHECK(nvs_set_u32(handle, SYS_KEY_MOTION_TIMEOUT, 1000));
+    ESP_ERROR_CHECK(nvs_set_u32(handle, SYS_KEY_STARTUP_DELAY, 2000));
+    ESP_ERROR_CHECK(nvs_set_u32(handle, SYS_KEY_MAX_CONTROL_FREQ, 100));
+    
+    // Float defaults as blobs
+    float default_voltage = 6.5f;
+    float default_temp = 80.0f;
+    ESP_ERROR_CHECK(nvs_set_blob(handle, SYS_KEY_SAFETY_VOLTAGE_MIN, &default_voltage, sizeof(float)));
+    ESP_ERROR_CHECK(nvs_set_blob(handle, SYS_KEY_TEMP_LIMIT_MAX, &default_temp, sizeof(float)));
+    
+    // Generate robot ID from MAC
+    char robot_id[32];
+    uint8_t mac[6];
+    esp_err_t err = esp_read_mac(mac, ESP_MAC_WIFI_STA);
+    if (err == ESP_OK) {
+        snprintf(robot_id, sizeof(robot_id), "HEXAPOD_%02X%02X%02X", mac[3], mac[4], mac[5]);
+    } else {
+        strcpy(robot_id, "HEXAPOD_DEFAULT");
+    }
+    ESP_ERROR_CHECK(nvs_set_str(handle, SYS_KEY_ROBOT_ID, robot_id));
+    ESP_ERROR_CHECK(nvs_set_str(handle, SYS_KEY_ROBOT_NAME, "My Hexapod Robot"));
+    
+    // Schema version for this namespace
+    ESP_ERROR_CHECK(nvs_set_u16(handle, SYS_KEY_CONFIG_VERSION, CONFIG_SCHEMA_VERSION));
+    
+    ESP_ERROR_CHECK(nvs_commit(handle));
+    ESP_LOGI(TAG, "System defaults written to NVS");
+    
+    return ESP_OK;
+}
+
+static esp_err_t migrate_v0_to_v1(void) {
+    ESP_LOGI(TAG, "Migrating v0 -> v1: Initializing fresh configuration");
+    
+    // Initialize all namespaces with defaults
+    ESP_ERROR_CHECK(init_system_defaults_to_nvs());
+    
+    // Future: Add other namespace initialization here
+    // ESP_ERROR_CHECK(init_motion_limits_defaults_to_nvs());
+    // ESP_ERROR_CHECK(init_joint_calib_defaults_to_nvs());
+    
+    ESP_LOGI(TAG, "Migration v0 -> v1 completed");
+    return ESP_OK;
+}
+
+static esp_err_t config_migrate_version(uint16_t from, uint16_t to) {
+    ESP_LOGI(TAG, "Migrating configuration schema: v%d -> v%d", from, to);
+    
+    switch (from) {
+        case 0:
+            if (to == 1) {
+                return migrate_v0_to_v1();
+            }
+            break;
+            
+        case 1:
+            // Future: v1 -> v2 migration
+            ESP_LOGW(TAG, "Migration v1 -> v%d not yet implemented", to);
+            return ESP_ERR_NOT_SUPPORTED;
+            
+        default:
+            ESP_LOGE(TAG, "Unknown migration path: v%d -> v%d", from, to);
+            return ESP_ERR_NOT_SUPPORTED;
+    }
+    
+    return ESP_ERR_NOT_SUPPORTED;
+}
+
+static esp_err_t config_migrate_all(uint16_t from_version, uint16_t to_version) {
+    ESP_LOGI(TAG, "Starting configuration migration: v%d -> v%d", from_version, to_version);
+    
+    if (from_version == to_version) {
+        ESP_LOGI(TAG, "No migration needed - versions match");
+        return ESP_OK;
+    }
+    
+    if (from_version > to_version) {
+        ESP_LOGE(TAG, "Downgrade not supported: v%d -> v%d", from_version, to_version);
+        return ESP_ERR_NOT_SUPPORTED;
+    }
+    
+    // Run migrations sequentially
+    for (uint16_t current_version = from_version; current_version < to_version; current_version++) {
+        esp_err_t err = config_migrate_version(current_version, current_version + 1);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Migration failed at v%d -> v%d: %s", 
+                     current_version, current_version + 1, esp_err_to_name(err));
+            return err;
+        }
+    }
+    
+    ESP_LOGI(TAG, "Migration completed successfully");
+    return ESP_OK;
+}
+
+// =============================================================================
+// Helper Functions  
+// =============================================================================
+
+static esp_err_t migrate_system_config(uint16_t from_version, uint16_t to_version) {
+    ESP_LOGI(TAG, "Migrating system config from version %d to %d", from_version, to_version);
+    
+    // Migration logic will be implemented here when schema changes occur
+    // For now, this is a placeholder that handles version transitions
+    
+    switch (from_version) {
+        case 0:
+            // Fresh partition - no migration needed, defaults will be used
+            ESP_LOGI(TAG, "Fresh partition - using default values");
+            break;
+            
+        case 1:
+            // Future: Add migration logic for v1 -> v2 when needed
+            // Example: rename keys, convert formats, etc.
+            ESP_LOGW(TAG, "Migration from v1 not yet implemented - using defaults");
+            break;
+            
+        default:
+            ESP_LOGW(TAG, "Unknown version %d - using defaults", from_version);
+            break;
+    }
+    
+    return ESP_OK;
+}
 
 static esp_err_t load_system_config_from_nvs(void) {
     nvs_handle_t handle = g_manager_state.nvs_handles[CONFIG_NS_SYSTEM];
     esp_err_t err;
     
-    ESP_LOGI(TAG, "Loading system configuration from NVS");
+    ESP_LOGI(TAG, "Loading system configuration from NVS (read-only)");
     
-    // Load each parameter with fallback to defaults
+    // PURE READ FUNCTION - No migration, no writes, assumes correct schema
     size_t required_size = 0;
     
     // Boolean parameters
-    uint8_t temp_bool = g_system_config.emergency_stop_enabled ? 1 : 0;
+    uint8_t temp_bool = 0;
     err = nvs_get_u8(handle, SYS_KEY_EMERGENCY_STOP, &temp_bool);
     if (err == ESP_OK) {
         g_system_config.emergency_stop_enabled = (temp_bool != 0);
+    } else {
+        ESP_LOGW(TAG, "Failed to read emergency_stop, using default: %s", esp_err_to_name(err));
     }
     
     // Integer parameters
-    nvs_get_u32(handle, SYS_KEY_AUTO_DISARM_TIMEOUT, &g_system_config.auto_disarm_timeout);
-    nvs_get_u32(handle, SYS_KEY_MOTION_TIMEOUT, &g_system_config.motion_timeout_ms);
-    nvs_get_u32(handle, SYS_KEY_STARTUP_DELAY, &g_system_config.startup_delay_ms);
-    nvs_get_u32(handle, SYS_KEY_MAX_CONTROL_FREQ, &g_system_config.max_control_frequency);
+    err = nvs_get_u32(handle, SYS_KEY_AUTO_DISARM_TIMEOUT, &g_system_config.auto_disarm_timeout);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
+        ESP_LOGW(TAG, "Failed to read auto_disarm_timeout: %s", esp_err_to_name(err));
+    }
+    
+    err = nvs_get_u32(handle, SYS_KEY_MOTION_TIMEOUT, &g_system_config.motion_timeout_ms);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
+        ESP_LOGW(TAG, "Failed to read motion_timeout: %s", esp_err_to_name(err));
+    }
+    
+    err = nvs_get_u32(handle, SYS_KEY_STARTUP_DELAY, &g_system_config.startup_delay_ms);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
+        ESP_LOGW(TAG, "Failed to read startup_delay: %s", esp_err_to_name(err));
+    }
+    
+    err = nvs_get_u32(handle, SYS_KEY_MAX_CONTROL_FREQ, &g_system_config.max_control_frequency);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
+        ESP_LOGW(TAG, "Failed to read max_control_freq: %s", esp_err_to_name(err));
+    }
     
     // Float parameters (stored as blobs for precision)
     required_size = sizeof(float);
-    nvs_get_blob(handle, SYS_KEY_SAFETY_VOLTAGE_MIN, &g_system_config.safety_voltage_min, &required_size);
+    err = nvs_get_blob(handle, SYS_KEY_SAFETY_VOLTAGE_MIN, &g_system_config.safety_voltage_min, &required_size);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
+        ESP_LOGW(TAG, "Failed to read safety_voltage_min: %s", esp_err_to_name(err));
+    }
+    
     required_size = sizeof(float);
-    nvs_get_blob(handle, SYS_KEY_TEMP_LIMIT_MAX, &g_system_config.temperature_limit_max, &required_size);
+    err = nvs_get_blob(handle, SYS_KEY_TEMP_LIMIT_MAX, &g_system_config.temperature_limit_max, &required_size);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
+        ESP_LOGW(TAG, "Failed to read temp_limit_max: %s", esp_err_to_name(err));
+    }
     
     // String parameters
     required_size = sizeof(g_system_config.robot_id);
-    nvs_get_str(handle, SYS_KEY_ROBOT_ID, g_system_config.robot_id, &required_size);
+    err = nvs_get_str(handle, SYS_KEY_ROBOT_ID, g_system_config.robot_id, &required_size);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
+        ESP_LOGW(TAG, "Failed to read robot_id: %s", esp_err_to_name(err));
+    }
     
     required_size = sizeof(g_system_config.robot_name);
-    nvs_get_str(handle, SYS_KEY_ROBOT_NAME, g_system_config.robot_name, &required_size);
+    err = nvs_get_str(handle, SYS_KEY_ROBOT_NAME, g_system_config.robot_name, &required_size);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
+        ESP_LOGW(TAG, "Failed to read robot_name: %s", esp_err_to_name(err));
+    }
     
-    // Version parameter
-    uint16_t version = CONFIG_SCHEMA_VERSION;
-    err = nvs_get_u16(handle, SYS_KEY_CONFIG_VERSION, &version);
-    g_system_config.config_version = version;
-    
-    // TODO: Handle version migration here when needed
-    if (version != CONFIG_SCHEMA_VERSION) {
-        ESP_LOGW(TAG, "Config version mismatch: stored=%d, current=%d", version, CONFIG_SCHEMA_VERSION);
+    // Read namespace version
+    uint16_t namespace_version = 0;
+    err = nvs_get_u16(handle, SYS_KEY_CONFIG_VERSION, &namespace_version);
+    if (err == ESP_OK) {
+        g_system_config.config_version = namespace_version;
+    } else {
+        ESP_LOGW(TAG, "Failed to read namespace config version: %s", esp_err_to_name(err));
+        g_system_config.config_version = CONFIG_SCHEMA_VERSION;  // Assume current
     }
     
     g_manager_state.namespace_loaded[CONFIG_NS_SYSTEM] = true;
     g_manager_state.namespace_dirty[CONFIG_NS_SYSTEM] = false;
     
-    ESP_LOGI(TAG, "System config loaded - robot_id=%s, robot_name=%s", 
-             g_system_config.robot_id, g_system_config.robot_name);
+    ESP_LOGI(TAG, "System config loaded - robot_id=%s, robot_name=%s, version=%d", 
+             g_system_config.robot_id, g_system_config.robot_name, g_system_config.config_version);
     
     return ESP_OK;
 }
@@ -211,11 +400,46 @@ esp_err_t config_manager_init(void) {
                  CONFIG_NAMESPACE_NAMES[i], NVS_PARTITION_ROBOT);
     }
     
-    // Load default configurations
+    // STEP 1: Read global configuration version
+    uint16_t stored_version = 0;
+    err = read_global_config_version(&stored_version);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read global config version: %s", esp_err_to_name(err));
+        return err;
+    }
+    
+    ESP_LOGI(TAG, "Global config version: stored=%d, current=%d", stored_version, CONFIG_SCHEMA_VERSION);
+    
+    // STEP 2: Run migration FIRST if needed (before any loading)
+    if (stored_version != CONFIG_SCHEMA_VERSION) {
+        ESP_LOGI(TAG, "Configuration migration required");
+        err = config_migrate_all(stored_version, CONFIG_SCHEMA_VERSION);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Migration failed: %s", esp_err_to_name(err));
+            return err;
+        }
+        
+        // Save updated global version
+        err = save_global_config_version(CONFIG_SCHEMA_VERSION);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to save new global version: %s", esp_err_to_name(err));
+            return err;
+        }
+        
+        ESP_LOGI(TAG, "Configuration migration completed successfully");
+    } else {
+        ESP_LOGI(TAG, "No migration needed - configuration up to date");
+    }
+    
+    // STEP 3: Load default configurations into memory cache
     config_load_system_defaults(&g_system_config);
     
-    // Load configurations from NVS (will use defaults for missing values)
-    load_system_config_from_nvs();
+    // STEP 4: Load configurations from NVS (guaranteed correct schema now)
+    err = load_system_config_from_nvs();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to load system config from NVS: %s", esp_err_to_name(err));
+        return err;
+    }
     
     g_manager_state.initialized = true;
     ESP_LOGI(TAG, "Configuration manager initialized successfully");
