@@ -1,0 +1,6 @@
+# ESP32 Partition Table for Hexapod Robot
+# Name,     Type, SubType, Offset,  Size,    Flags
+nvs,        data, nvs,     0x9000,  0x6000,  
+nvs_robot,  data, nvs,     0xf000,  0x10000, 
+phy_init,   data, phy,     0x1f000, 0x1000,  
+factory,    app,  factory, 0x20000, 0x170000,

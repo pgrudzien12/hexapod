@@ -22,6 +22,7 @@
 #include "controller_bt_classic.h"
 #include "kpp_system.h"
 #include "kpp_debug.h"
+#include "config_manager.h"
 
 static const char *TAG = "leg";
 
@@ -103,6 +104,28 @@ void gait_framework_main(void *arg)
 
 void app_main(void)
 {
+    // Initialize configuration manager first
+    ESP_LOGI(TAG, "Starting hexapod application...");
+    esp_err_t err = config_manager_init();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize configuration manager: %s", esp_err_to_name(err));
+        return;
+    }
+    
+    // Get system configuration
+    const system_config_t* sys_config = config_get_system();
+    ESP_LOGI(TAG, "System config loaded: robot_id=%s, robot_name=%s", 
+             sys_config->robot_id, sys_config->robot_name);
+    ESP_LOGI(TAG, "Safety settings: emergency_stop=%s, voltage_min=%.2fV", 
+             sys_config->emergency_stop_enabled ? "enabled" : "disabled",
+             sys_config->safety_voltage_min);
+    
+    // Apply startup delay from configuration
+    if (sys_config->startup_delay_ms > 0) {
+        ESP_LOGI(TAG, "Applying startup delay: %lu ms", (unsigned long)sys_config->startup_delay_ms);
+        vTaskDelay(pdMS_TO_TICKS(sys_config->startup_delay_ms));
+    }
+    
     // Bring up WiFi AP early so that network-based controller drivers or diagnostics
     // can connect even if later initialization stalls. Uses default options (MAC suffix).
     // wifi_ap_init_once();
