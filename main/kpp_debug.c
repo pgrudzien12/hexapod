@@ -55,11 +55,11 @@ void kpp_debug_monitor_limits(const kinematic_state_t* state,
         float body_roll = state->body_orientation[0] * 180.0f / 3.14159f;
         float body_pitch = state->body_orientation[1] * 180.0f / 3.14159f;
         
-        ESP_LOGI(TAG, "MOTION: gait=%.3f limited=%.3f diff=%.3f body_roll=%.1f° pitch=%.1f°", 
+        ESP_LOGD(TAG, "MOTION: gait=%.3f limited=%.3f diff=%.3f body_roll=%.1f° pitch=%.1f°", 
                  gait_cmd, limited_cmd_val, fabsf(gait_cmd - limited_cmd_val), body_roll, body_pitch);
                  
         // Log acceleration and jerk statistics for limit tuning
-        ESP_LOGI(TAG, "LIMITS: max_accel=%.1f max_jerk=%.0f min_accel=%.1f min_jerk=%.0f", 
+        ESP_LOGD(TAG, "LIMITS: max_accel=%.1f max_jerk=%.0f min_accel=%.1f min_jerk=%.0f", 
                  max_accel_seen, max_jerk_seen, min_accel_seen, min_jerk_seen);
         
         // Reset statistics for next period
