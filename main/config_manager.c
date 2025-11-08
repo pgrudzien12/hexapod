@@ -12,6 +12,7 @@
 #include "esp_partition.h"
 #include <string.h>
 #include <stdio.h>
+#include <stddef.h>
 
 static const char *TAG = "config_mgr";
 
@@ -514,97 +515,401 @@ const system_config_t* config_get_system(void) {
     return &g_system_config;
 }
 
-system_config_t* config_get_system_mutable(void) {
-    return &g_system_config;
+// =============================================================================
+// Parameter Tables and Metadata
+// =============================================================================
+
+// System namespace parameter table
+static const config_param_info_t g_system_param_table[] = {
+    {
+        .name = "emergency_stop_enabled",
+        .type = CONFIG_TYPE_BOOL,
+        .offset = offsetof(system_config_t, emergency_stop_enabled),
+        .size = sizeof(bool),
+        .description = "Emergency stop functionality enabled",
+        .constraints = { .int_range = { 0, 1 } }
+    },
+    {
+        .name = "auto_disarm_timeout",
+        .type = CONFIG_TYPE_INT32,
+        .offset = offsetof(system_config_t, auto_disarm_timeout),
+        .size = sizeof(uint32_t),
+        .description = "Auto-disarm timeout in seconds",
+        .constraints = { .int_range = { 5, 300 } }
+    },
+    {
+        .name = "safety_voltage_min",
+        .type = CONFIG_TYPE_FLOAT,
+        .offset = offsetof(system_config_t, safety_voltage_min),
+        .size = sizeof(float),
+        .description = "Minimum battery voltage in volts",
+        .constraints = { .float_range = { 3.0f, 12.0f } }
+    },
+    {
+        .name = "temperature_limit_max",
+        .type = CONFIG_TYPE_FLOAT,
+        .offset = offsetof(system_config_t, temperature_limit_max),
+        .size = sizeof(float),
+        .description = "Maximum operating temperature in Celsius",
+        .constraints = { .float_range = { 40.0f, 100.0f } }
+    },
+    {
+        .name = "motion_timeout_ms",
+        .type = CONFIG_TYPE_INT32,
+        .offset = offsetof(system_config_t, motion_timeout_ms),
+        .size = sizeof(uint32_t),
+        .description = "Motion command timeout in milliseconds",
+        .constraints = { .int_range = { 100, 5000 } }
+    },
+    {
+        .name = "startup_delay_ms",
+        .type = CONFIG_TYPE_INT32,
+        .offset = offsetof(system_config_t, startup_delay_ms),
+        .size = sizeof(uint32_t),
+        .description = "Startup safety delay in milliseconds",
+        .constraints = { .int_range = { 0, 10000 } }
+    },
+    {
+        .name = "max_control_frequency",
+        .type = CONFIG_TYPE_INT32,
+        .offset = offsetof(system_config_t, max_control_frequency),
+        .size = sizeof(uint32_t),
+        .description = "Maximum control loop frequency in Hz",
+        .constraints = { .int_range = { 50, 1000 } }
+    },
+    {
+        .name = "robot_id",
+        .type = CONFIG_TYPE_STRING,
+        .offset = offsetof(system_config_t, robot_id),
+        .size = sizeof(((system_config_t*)0)->robot_id),
+        .description = "Unique robot identifier",
+        .constraints = { .string = { 32 } }
+    },
+    {
+        .name = "robot_name",
+        .type = CONFIG_TYPE_STRING,
+        .offset = offsetof(system_config_t, robot_name),
+        .size = sizeof(((system_config_t*)0)->robot_name),
+        .description = "Human-readable robot name",
+        .constraints = { .string = { 64 } }
+    },
+    {
+        .name = "config_version",
+        .type = CONFIG_TYPE_INT32,
+        .offset = offsetof(system_config_t, config_version),
+        .size = sizeof(uint16_t),
+        .description = "Configuration schema version",
+        .constraints = { .int_range = { 1, 65535 } }
+    }
+};
+
+static const size_t g_system_param_count = sizeof(g_system_param_table) / sizeof(g_system_param_table[0]);
+
+// Helper function to find parameter in table
+static const config_param_info_t* find_system_param(const char* param_name) {
+    for (size_t i = 0; i < g_system_param_count; i++) {
+        if (strcmp(g_system_param_table[i].name, param_name) == 0) {
+            return &g_system_param_table[i];
+        }
+    }
+    return NULL;
+}
+
+// Helper function to get parameter pointer in config struct
+static void* get_system_param_ptr(const config_param_info_t* param) {
+    return (uint8_t*)&g_system_config + param->offset;
 }
 
 // =============================================================================
-// Dual-Method System Parameter API
+// Bulk Configuration API (Approach A)
 // =============================================================================
 
-esp_err_t config_set_emergency_stop_memory(bool enabled) {
-    g_system_config.emergency_stop_enabled = enabled;
-    g_manager_state.namespace_dirty[CONFIG_NS_SYSTEM] = true;
-    ESP_LOGD(TAG, "Set emergency stop (memory): %s", enabled ? "enabled" : "disabled");
-    return ESP_OK;
-}
-
-esp_err_t config_set_emergency_stop_persist(bool enabled) {
-    esp_err_t err = config_set_emergency_stop_memory(enabled);
-    if (err != ESP_OK) {
-        return err;
-    }
-    return config_manager_save_namespace(CONFIG_NS_SYSTEM);
-}
-
-esp_err_t config_set_auto_disarm_timeout_memory(uint32_t timeout_sec) {
-    g_system_config.auto_disarm_timeout = timeout_sec;
-    g_manager_state.namespace_dirty[CONFIG_NS_SYSTEM] = true;
-    ESP_LOGD(TAG, "Set auto-disarm timeout (memory): %lu seconds", (unsigned long)timeout_sec);
-    return ESP_OK;
-}
-
-esp_err_t config_set_auto_disarm_timeout_persist(uint32_t timeout_sec) {
-    esp_err_t err = config_set_auto_disarm_timeout_memory(timeout_sec);
-    if (err != ESP_OK) {
-        return err;
-    }
-    return config_manager_save_namespace(CONFIG_NS_SYSTEM);
-}
-
-esp_err_t config_set_safety_voltage_min_memory(float voltage_min) {
-    g_system_config.safety_voltage_min = voltage_min;
-    g_manager_state.namespace_dirty[CONFIG_NS_SYSTEM] = true;
-    ESP_LOGD(TAG, "Set safety voltage min (memory): %.2f V", voltage_min);
-    return ESP_OK;
-}
-
-esp_err_t config_set_safety_voltage_min_persist(float voltage_min) {
-    esp_err_t err = config_set_safety_voltage_min_memory(voltage_min);
-    if (err != ESP_OK) {
-        return err;
-    }
-    return config_manager_save_namespace(CONFIG_NS_SYSTEM);
-}
-
-esp_err_t config_set_robot_name_memory(const char* name) {
-    if (!name || strlen(name) >= sizeof(g_system_config.robot_name)) {
+esp_err_t config_set_system(const system_config_t* config) {
+    if (!config) {
         return ESP_ERR_INVALID_ARG;
     }
     
-    strncpy(g_system_config.robot_name, name, sizeof(g_system_config.robot_name) - 1);
-    g_system_config.robot_name[sizeof(g_system_config.robot_name) - 1] = '\0';
+    memcpy(&g_system_config, config, sizeof(system_config_t));
     g_manager_state.namespace_dirty[CONFIG_NS_SYSTEM] = true;
-    ESP_LOGD(TAG, "Set robot name (memory): %s", name);
-    return ESP_OK;
-}
-
-esp_err_t config_set_robot_name_persist(const char* name) {
-    esp_err_t err = config_set_robot_name_memory(name);
-    if (err != ESP_OK) {
-        return err;
+    
+    esp_err_t err = config_manager_save_namespace(CONFIG_NS_SYSTEM);
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "System configuration updated (bulk operation)");
     }
-    return config_manager_save_namespace(CONFIG_NS_SYSTEM);
+    return err;
 }
 
-esp_err_t config_set_robot_id_memory(const char* id) {
-    if (!id || strlen(id) >= sizeof(g_system_config.robot_id)) {
+// =============================================================================
+// Hybrid Parameter API (Approach B)
+// =============================================================================
+
+esp_err_t hexapod_config_get_bool(const char* namespace_str, const char* param_name, bool* value) {
+    if (!namespace_str || !param_name || !value) {
         return ESP_ERR_INVALID_ARG;
     }
     
-    strncpy(g_system_config.robot_id, id, sizeof(g_system_config.robot_id) - 1);
-    g_system_config.robot_id[sizeof(g_system_config.robot_id) - 1] = '\0';
-    g_manager_state.namespace_dirty[CONFIG_NS_SYSTEM] = true;
-    ESP_LOGD(TAG, "Set robot ID (memory): %s", id);
+    if (strcmp(namespace_str, "system") == 0) {
+        const config_param_info_t* param = find_system_param(param_name);
+        if (!param || param->type != CONFIG_TYPE_BOOL) {
+            return ESP_ERR_NOT_FOUND;
+        }
+        
+        bool* param_ptr = (bool*)get_system_param_ptr(param);
+        *value = *param_ptr;
+        return ESP_OK;
+    }
+    
+    return ESP_ERR_NOT_FOUND;
+}
+
+esp_err_t hexapod_config_set_bool(const char* namespace_str, const char* param_name, bool value, bool persist) {
+    if (!namespace_str || !param_name) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    if (strcmp(namespace_str, "system") == 0) {
+        const config_param_info_t* param = find_system_param(param_name);
+        if (!param || param->type != CONFIG_TYPE_BOOL) {
+            return ESP_ERR_NOT_FOUND;
+        }
+        
+        bool* param_ptr = (bool*)get_system_param_ptr(param);
+        *param_ptr = value;
+        g_manager_state.namespace_dirty[CONFIG_NS_SYSTEM] = true;
+        
+        ESP_LOGD(TAG, "Set %s.%s = %s %s", namespace_str, param_name, 
+                 value ? "true" : "false", persist ? "(persistent)" : "(memory-only)");
+        
+        if (persist) {
+            return config_manager_save_namespace(CONFIG_NS_SYSTEM);
+        }
+        return ESP_OK;
+    }
+    
+    return ESP_ERR_NOT_FOUND;
+}
+
+esp_err_t hexapod_config_get_int32(const char* namespace_str, const char* param_name, int32_t* value) {
+    if (!namespace_str || !param_name || !value) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    if (strcmp(namespace_str, "system") == 0) {
+        const config_param_info_t* param = find_system_param(param_name);
+        if (!param || param->type != CONFIG_TYPE_INT32) {
+            return ESP_ERR_NOT_FOUND;
+        }
+        
+        int32_t* param_ptr = (int32_t*)get_system_param_ptr(param);
+        *value = *param_ptr;
+        return ESP_OK;
+    }
+    
+    return ESP_ERR_NOT_FOUND;
+}
+
+esp_err_t hexapod_config_set_int32(const char* namespace_str, const char* param_name, int32_t value, bool persist) {
+    if (!namespace_str || !param_name) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    if (strcmp(namespace_str, "system") == 0) {
+        const config_param_info_t* param = find_system_param(param_name);
+        if (!param || param->type != CONFIG_TYPE_INT32) {
+            return ESP_ERR_NOT_FOUND;
+        }
+        
+        // Validate constraints
+        if (value < param->constraints.int_range.min || value > param->constraints.int_range.max) {
+            ESP_LOGE(TAG, "Value %ld for %s.%s out of range [%ld, %ld]", 
+                     (long)value, namespace_str, param_name,
+                     (long)param->constraints.int_range.min, 
+                     (long)param->constraints.int_range.max);
+            return ESP_ERR_INVALID_ARG;
+        }
+        
+        int32_t* param_ptr = (int32_t*)get_system_param_ptr(param);
+        *param_ptr = value;
+        g_manager_state.namespace_dirty[CONFIG_NS_SYSTEM] = true;
+        
+        ESP_LOGD(TAG, "Set %s.%s = %ld %s", namespace_str, param_name, 
+                 (long)value, persist ? "(persistent)" : "(memory-only)");
+        
+        if (persist) {
+            return config_manager_save_namespace(CONFIG_NS_SYSTEM);
+        }
+        return ESP_OK;
+    }
+    
+    return ESP_ERR_NOT_FOUND;
+}
+
+esp_err_t hexapod_config_get_float(const char* namespace_str, const char* param_name, float* value) {
+    if (!namespace_str || !param_name || !value) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    if (strcmp(namespace_str, "system") == 0) {
+        const config_param_info_t* param = find_system_param(param_name);
+        if (!param || param->type != CONFIG_TYPE_FLOAT) {
+            return ESP_ERR_NOT_FOUND;
+        }
+        
+        float* param_ptr = (float*)get_system_param_ptr(param);
+        *value = *param_ptr;
+        return ESP_OK;
+    }
+    
+    return ESP_ERR_NOT_FOUND;
+}
+
+esp_err_t hexapod_config_set_float(const char* namespace_str, const char* param_name, float value, bool persist) {
+    if (!namespace_str || !param_name) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    if (strcmp(namespace_str, "system") == 0) {
+        const config_param_info_t* param = find_system_param(param_name);
+        if (!param || param->type != CONFIG_TYPE_FLOAT) {
+            return ESP_ERR_NOT_FOUND;
+        }
+        
+        // Validate constraints
+        if (value < param->constraints.float_range.min || value > param->constraints.float_range.max) {
+            ESP_LOGE(TAG, "Value %.3f for %s.%s out of range [%.3f, %.3f]", 
+                     value, namespace_str, param_name,
+                     param->constraints.float_range.min, param->constraints.float_range.max);
+            return ESP_ERR_INVALID_ARG;
+        }
+        
+        float* param_ptr = (float*)get_system_param_ptr(param);
+        *param_ptr = value;
+        g_manager_state.namespace_dirty[CONFIG_NS_SYSTEM] = true;
+        
+        ESP_LOGD(TAG, "Set %s.%s = %.3f %s", namespace_str, param_name, 
+                 value, persist ? "(persistent)" : "(memory-only)");
+        
+        if (persist) {
+            return config_manager_save_namespace(CONFIG_NS_SYSTEM);
+        }
+        return ESP_OK;
+    }
+    
+    return ESP_ERR_NOT_FOUND;
+}
+
+esp_err_t hexapod_config_get_string(const char* namespace_str, const char* param_name, char* value, size_t max_len) {
+    if (!namespace_str || !param_name || !value || max_len == 0) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    if (strcmp(namespace_str, "system") == 0) {
+        const config_param_info_t* param = find_system_param(param_name);
+        if (!param || param->type != CONFIG_TYPE_STRING) {
+            return ESP_ERR_NOT_FOUND;
+        }
+        
+        char* param_ptr = (char*)get_system_param_ptr(param);
+        strncpy(value, param_ptr, max_len - 1);
+        value[max_len - 1] = '\0';
+        return ESP_OK;
+    }
+    
+    return ESP_ERR_NOT_FOUND;
+}
+
+esp_err_t hexapod_config_set_string(const char* namespace_str, const char* param_name, const char* value, bool persist) {
+    if (!namespace_str || !param_name || !value) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    if (strcmp(namespace_str, "system") == 0) {
+        const config_param_info_t* param = find_system_param(param_name);
+        if (!param || param->type != CONFIG_TYPE_STRING) {
+            return ESP_ERR_NOT_FOUND;
+        }
+        
+        // Validate length
+        size_t value_len = strlen(value);
+        if (value_len >= param->constraints.string.max_length) {
+            ESP_LOGE(TAG, "String too long for %s.%s: %zu >= %zu", 
+                     namespace_str, param_name, value_len, param->constraints.string.max_length);
+            return ESP_ERR_INVALID_ARG;
+        }
+        
+        char* param_ptr = (char*)get_system_param_ptr(param);
+        strncpy(param_ptr, value, param->size - 1);
+        param_ptr[param->size - 1] = '\0';
+        g_manager_state.namespace_dirty[CONFIG_NS_SYSTEM] = true;
+        
+        ESP_LOGD(TAG, "Set %s.%s = \"%s\" %s", namespace_str, param_name, 
+                 value, persist ? "(persistent)" : "(memory-only)");
+        
+        if (persist) {
+            return config_manager_save_namespace(CONFIG_NS_SYSTEM);
+        }
+        return ESP_OK;
+    }
+    
+    return ESP_ERR_NOT_FOUND;
+}
+
+// =============================================================================
+// Parameter Discovery and Metadata API
+// =============================================================================
+
+esp_err_t config_list_namespaces(const char** namespace_names, size_t* count) {
+    if (!namespace_names || !count) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    for (int i = 0; i < CONFIG_NS_COUNT; i++) {
+        namespace_names[i] = CONFIG_NAMESPACE_NAMES[i];
+    }
+    
+    *count = CONFIG_NS_COUNT;
     return ESP_OK;
 }
 
-esp_err_t config_set_robot_id_persist(const char* id) {
-    esp_err_t err = config_set_robot_id_memory(id);
-    if (err != ESP_OK) {
-        return err;
+esp_err_t config_list_parameters(const char* namespace_str, const char** param_names, 
+                                size_t max_params, size_t* count) {
+    if (!namespace_str || !param_names || !count) {
+        return ESP_ERR_INVALID_ARG;
     }
-    return config_manager_save_namespace(CONFIG_NS_SYSTEM);
+    
+    *count = 0;
+    
+    if (strcmp(namespace_str, "system") == 0) {
+        size_t params_to_copy = (g_system_param_count < max_params) ? g_system_param_count : max_params;
+        
+        for (size_t i = 0; i < params_to_copy; i++) {
+            param_names[i] = g_system_param_table[i].name;
+        }
+        
+        *count = params_to_copy;
+        return ESP_OK;
+    }
+    
+    return ESP_ERR_NOT_FOUND;
+}
+
+esp_err_t config_get_parameter_info(const char* namespace_str, const char* param_name, 
+                                   config_param_info_t* info) {
+    if (!namespace_str || !param_name || !info) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    if (strcmp(namespace_str, "system") == 0) {
+        const config_param_info_t* param = find_system_param(param_name);
+        if (!param) {
+            return ESP_ERR_NOT_FOUND;
+        }
+        
+        memcpy(info, param, sizeof(config_param_info_t));
+        return ESP_OK;
+    }
+    
+    return ESP_ERR_NOT_FOUND;
 }
 
 // =============================================================================
@@ -675,97 +980,72 @@ esp_err_t config_factory_reset(void) {
 }
 
 // =============================================================================
-// Generic Parameter API (Basic Implementation)
+// Legacy Generic Parameter API (reimplemented using new system)
 // =============================================================================
 
 esp_err_t config_get_parameter(const char* namespace_str, const char* key, 
                                void* value_out, size_t value_size) {
-    // Basic implementation for system namespace only
     if (!namespace_str || !key || !value_out) {
         return ESP_ERR_INVALID_ARG;
     }
     
     if (strcmp(namespace_str, "system") == 0) {
-        // Handle system parameters
-        if (strcmp(key, "emergency_stop_enabled") == 0 && value_size >= sizeof(bool)) {
-            *(bool*)value_out = g_system_config.emergency_stop_enabled;
-            return ESP_OK;
-        } else if (strcmp(key, "robot_name") == 0 && value_size >= strlen(g_system_config.robot_name) + 1) {
-            strcpy((char*)value_out, g_system_config.robot_name);
-            return ESP_OK;
+        const config_param_info_t* param = find_system_param(key);
+        if (!param) {
+            return ESP_ERR_NOT_FOUND;
         }
-        // Add more parameters as needed
+        
+        // Check buffer size
+        if (value_size < param->size) {
+            return ESP_ERR_INVALID_SIZE;
+        }
+        
+        void* param_ptr = get_system_param_ptr(param);
+        memcpy(value_out, param_ptr, param->size);
+        return ESP_OK;
     }
     
     return ESP_ERR_NOT_FOUND;
 }
 
-esp_err_t config_set_parameter_memory(const char* namespace_str, const char* key,
-                                      const void* value, size_t value_size) {
-    // Basic implementation for system namespace only
+esp_err_t config_set_parameter(const char* namespace_str, const char* key,
+                               const void* value, size_t value_size, bool persist) {
     if (!namespace_str || !key || !value) {
         return ESP_ERR_INVALID_ARG;
     }
     
     if (strcmp(namespace_str, "system") == 0) {
-        if (strcmp(key, "emergency_stop_enabled") == 0 && value_size == sizeof(bool)) {
-            return config_set_emergency_stop_memory(*(const bool*)value);
-        } else if (strcmp(key, "robot_name") == 0) {
-            return config_set_robot_name_memory((const char*)value);
+        const config_param_info_t* param = find_system_param(key);
+        if (!param) {
+            return ESP_ERR_NOT_FOUND;
         }
-        // Add more parameters as needed
-    }
-    
-    return ESP_ERR_NOT_FOUND;
-}
-
-esp_err_t config_set_parameter_persist(const char* namespace_str, const char* key,
-                                       const void* value, size_t value_size) {
-    esp_err_t err = config_set_parameter_memory(namespace_str, key, value, value_size);
-    if (err != ESP_OK) {
+        
+        // Check value size
+        if (value_size != param->size) {
+            return ESP_ERR_INVALID_SIZE;
+        }
+        
+        // Use type-specific functions for validation
+        esp_err_t err = ESP_OK;
+        switch (param->type) {
+            case CONFIG_TYPE_BOOL:
+                err = hexapod_config_set_bool(namespace_str, key, *(const bool*)value, persist);
+                break;
+            case CONFIG_TYPE_INT32:
+                err = hexapod_config_set_int32(namespace_str, key, *(const int32_t*)value, persist);
+                break;
+            case CONFIG_TYPE_FLOAT:
+                err = hexapod_config_set_float(namespace_str, key, *(const float*)value, persist);
+                break;
+            case CONFIG_TYPE_STRING:
+                err = hexapod_config_set_string(namespace_str, key, (const char*)value, persist);
+                break;
+            default:
+                err = ESP_ERR_NOT_SUPPORTED;
+                break;
+        }
+        
         return err;
-    }
-    
-    // Determine which namespace to save
-    if (strcmp(namespace_str, "system") == 0) {
-        return config_manager_save_namespace(CONFIG_NS_SYSTEM);
-    }
-    
-    return ESP_ERR_NOT_FOUND;
-}
-
-esp_err_t config_enumerate_keys(const char* namespace_str, const char* key_list[], 
-                                size_t max_keys, size_t* actual_keys) {
-    if (!namespace_str || !key_list || !actual_keys) {
-        return ESP_ERR_INVALID_ARG;
-    }
-    
-    *actual_keys = 0;
-    
-    if (strcmp(namespace_str, "system") == 0) {
-        // List system configuration keys
-        const char* system_keys[] = {
-            "emergency_stop_enabled",
-            "auto_disarm_timeout", 
-            "safety_voltage_min",
-            "temperature_limit_max",
-            "motion_timeout_ms",
-            "startup_delay_ms",
-            "max_control_frequency",
-            "robot_id",
-            "robot_name",
-            "config_version"
-        };
-        
-        size_t num_keys = sizeof(system_keys) / sizeof(system_keys[0]);
-        size_t keys_to_copy = (num_keys < max_keys) ? num_keys : max_keys;
-        
-        for (size_t i = 0; i < keys_to_copy; i++) {
-            key_list[i] = system_keys[i];
-        }
-        
-        *actual_keys = keys_to_copy;
-        return ESP_OK;
     }
     
     return ESP_ERR_NOT_FOUND;

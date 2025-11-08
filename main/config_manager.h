@@ -120,145 +120,195 @@ esp_err_t config_manager_save_namespace(config_namespace_t ns);
 const system_config_t* config_get_system(void);
 
 /**
- * @brief Get system configuration (mutable, for memory-only changes)
+ * @brief Set complete system configuration structure (always persistent)
  * 
- * @return Pointer to system configuration structure (writable)
- */
-system_config_t* config_get_system_mutable(void);
-
-// Dual-method API for individual system parameters
-
-/**
- * @brief Set emergency stop enable (memory only)
- * 
- * @param enabled Emergency stop enabled state
- * @return ESP_OK on success
- */
-esp_err_t config_set_emergency_stop_memory(bool enabled);
-
-/**
- * @brief Set emergency stop enable (persistent)
- * 
- * @param enabled Emergency stop enabled state
+ * @param config Pointer to system configuration structure
  * @return ESP_OK on success, error code on NVS write failure
  */
-esp_err_t config_set_emergency_stop_persist(bool enabled);
-
-/**
- * @brief Set auto-disarm timeout (memory only)
- * 
- * @param timeout_sec Timeout in seconds
- * @return ESP_OK on success
- */
-esp_err_t config_set_auto_disarm_timeout_memory(uint32_t timeout_sec);
-
-/**
- * @brief Set auto-disarm timeout (persistent)
- * 
- * @param timeout_sec Timeout in seconds
- * @return ESP_OK on success, error code on NVS write failure
- */
-esp_err_t config_set_auto_disarm_timeout_persist(uint32_t timeout_sec);
-
-/**
- * @brief Set safety voltage minimum (memory only)
- * 
- * @param voltage_min Minimum voltage in volts
- * @return ESP_OK on success
- */
-esp_err_t config_set_safety_voltage_min_memory(float voltage_min);
-
-/**
- * @brief Set safety voltage minimum (persistent)
- * 
- * @param voltage_min Minimum voltage in volts
- * @return ESP_OK on success, error code on NVS write failure
- */
-esp_err_t config_set_safety_voltage_min_persist(float voltage_min);
-
-/**
- * @brief Set robot name (memory only)
- * 
- * @param name Robot name string (max 63 chars)
- * @return ESP_OK on success, ESP_ERR_INVALID_ARG if name too long
- */
-esp_err_t config_set_robot_name_memory(const char* name);
-
-/**
- * @brief Set robot name (persistent)
- * 
- * @param name Robot name string (max 63 chars)
- * @return ESP_OK on success, error code on failure
- */
-esp_err_t config_set_robot_name_persist(const char* name);
-
-/**
- * @brief Set robot ID (memory only)
- * 
- * @param id Robot ID string (max 31 chars)
- * @return ESP_OK on success, ESP_ERR_INVALID_ARG if id too long
- */
-esp_err_t config_set_robot_id_memory(const char* id);
-
-/**
- * @brief Set robot ID (persistent)
- * 
- * @param id Robot ID string (max 31 chars)
- * @return ESP_OK on success, error code on failure
- */
-esp_err_t config_set_robot_id_persist(const char* id);
+esp_err_t config_set_system(const system_config_t* config);
 
 // =============================================================================
-// Generic Parameter API (for RPC integration)
+// Parameter Types and Metadata
+// =============================================================================
+
+typedef enum {
+    CONFIG_TYPE_BOOL = 0,
+    CONFIG_TYPE_INT32,
+    CONFIG_TYPE_FLOAT,
+    CONFIG_TYPE_STRING,
+    CONFIG_TYPE_COUNT
+} config_param_type_t;
+
+typedef struct {
+    const char* name;                   // Parameter name (e.g., "emergency_stop_enabled")
+    config_param_type_t type;          // Data type
+    size_t offset;                     // Offset in config struct
+    size_t size;                       // Size in bytes
+    const char* description;           // Human-readable description
+    union {
+        struct { int32_t min, max; } int_range;
+        struct { float min, max; } float_range;
+        struct { size_t max_length; } string;
+    } constraints;
+} config_param_info_t;
+
+// =============================================================================
+// Hybrid Parameter API (Approach B - Individual Parameters)
 // =============================================================================
 
 /**
- * @brief Get parameter value by string key
+ * @brief Get boolean parameter value
+ * 
+ * @param namespace_str Namespace name (e.g., "system")
+ * @param param_name Parameter name (e.g., "emergency_stop_enabled")
+ * @param[out] value Pointer to store the value
+ * @return ESP_OK on success, error code on failure
+ */
+esp_err_t hexapod_config_get_bool(const char* namespace_str, const char* param_name, bool* value);
+
+/**
+ * @brief Set boolean parameter value
+ * 
+ * @param namespace_str Namespace name
+ * @param param_name Parameter name
+ * @param value New value
+ * @param persist true to save to NVS, false for memory-only
+ * @return ESP_OK on success, error code on failure
+ */
+esp_err_t hexapod_config_set_bool(const char* namespace_str, const char* param_name, bool value, bool persist);
+
+/**
+ * @brief Get 32-bit integer parameter value
+ * 
+ * @param namespace_str Namespace name
+ * @param param_name Parameter name
+ * @param[out] value Pointer to store the value
+ * @return ESP_OK on success, error code on failure
+ */
+esp_err_t hexapod_config_get_int32(const char* namespace_str, const char* param_name, int32_t* value);
+
+/**
+ * @brief Set 32-bit integer parameter value
+ * 
+ * @param namespace_str Namespace name
+ * @param param_name Parameter name
+ * @param value New value
+ * @param persist true to save to NVS, false for memory-only
+ * @return ESP_OK on success, error code on failure
+ */
+esp_err_t hexapod_config_set_int32(const char* namespace_str, const char* param_name, int32_t value, bool persist);
+
+/**
+ * @brief Get float parameter value
+ * 
+ * @param namespace_str Namespace name
+ * @param param_name Parameter name
+ * @param[out] value Pointer to store the value
+ * @return ESP_OK on success, error code on failure
+ */
+esp_err_t hexapod_config_get_float(const char* namespace_str, const char* param_name, float* value);
+
+/**
+ * @brief Set float parameter value
+ * 
+ * @param namespace_str Namespace name
+ * @param param_name Parameter name
+ * @param value New value
+ * @param persist true to save to NVS, false for memory-only
+ * @return ESP_OK on success, error code on failure
+ */
+esp_err_t hexapod_config_set_float(const char* namespace_str, const char* param_name, float value, bool persist);
+
+/**
+ * @brief Get string parameter value
+ * 
+ * @param namespace_str Namespace name
+ * @param param_name Parameter name
+ * @param[out] value Buffer to store the string
+ * @param max_len Maximum length of the buffer (including null terminator)
+ * @return ESP_OK on success, error code on failure
+ */
+esp_err_t hexapod_config_get_string(const char* namespace_str, const char* param_name, char* value, size_t max_len);
+
+/**
+ * @brief Set string parameter value
+ * 
+ * @param namespace_str Namespace name
+ * @param param_name Parameter name
+ * @param value New string value
+ * @param persist true to save to NVS, false for memory-only
+ * @return ESP_OK on success, error code on failure
+ */
+esp_err_t hexapod_config_set_string(const char* namespace_str, const char* param_name, const char* value, bool persist);
+
+// =============================================================================
+// Parameter Discovery and Metadata API
+// =============================================================================
+
+/**
+ * @brief List all available namespaces
+ * 
+ * @param[out] namespace_names Array to store namespace name pointers
+ * @param[out] count Number of namespaces returned
+ * @return ESP_OK on success, error code on failure
+ */
+esp_err_t config_list_namespaces(const char** namespace_names, size_t* count);
+
+/**
+ * @brief List all parameters in a namespace
+ * 
+ * @param namespace_str Namespace name
+ * @param[out] param_names Array to store parameter name pointers
+ * @param max_params Maximum number of parameters to return
+ * @param[out] count Number of parameters returned
+ * @return ESP_OK on success, error code on failure
+ */
+esp_err_t config_list_parameters(const char* namespace_str, const char** param_names, 
+                                size_t max_params, size_t* count);
+
+/**
+ * @brief Get parameter metadata and constraints
+ * 
+ * @param namespace_str Namespace name
+ * @param param_name Parameter name
+ * @param[out] info Parameter information structure to fill
+ * @return ESP_OK on success, error code on failure
+ */
+esp_err_t config_get_parameter_info(const char* namespace_str, const char* param_name, 
+                                   config_param_info_t* info);
+
+// =============================================================================
+// Legacy Generic Parameter API (kept for backward compatibility)
+// =============================================================================
+
+/**
+ * @brief Get parameter value by string key (generic void* interface)
  * 
  * @param namespace_str Namespace name
  * @param key Parameter key
  * @param value_out Buffer for value (must be large enough for parameter type)
  * @param value_size Size of value buffer
  * @return ESP_OK on success, error code on failure
+ * 
+ * @note Prefer type-specific functions (hexapod_config_get_bool, hexapod_config_get_int32, etc.)
  */
 esp_err_t config_get_parameter(const char* namespace_str, const char* key, 
                                void* value_out, size_t value_size);
 
 /**
- * @brief Set parameter value by string key (memory only)
+ * @brief Set parameter value by string key (generic void* interface)
  * 
  * @param namespace_str Namespace name
  * @param key Parameter key
  * @param value Pointer to new value
  * @param value_size Size of value
+ * @param persist true to save to NVS, false for memory-only
  * @return ESP_OK on success, error code on failure
- */
-esp_err_t config_set_parameter_memory(const char* namespace_str, const char* key,
-                                      const void* value, size_t value_size);
-
-/**
- * @brief Set parameter value by string key (persistent)
  * 
- * @param namespace_str Namespace name
- * @param key Parameter key
- * @param value Pointer to new value
- * @param value_size Size of value
- * @return ESP_OK on success, error code on failure
+ * @note Prefer type-specific functions (hexapod_config_set_bool, hexapod_config_set_int32, etc.)
  */
-esp_err_t config_set_parameter_persist(const char* namespace_str, const char* key,
-                                       const void* value, size_t value_size);
-
-/**
- * @brief Enumerate parameter keys in namespace
- * 
- * @param namespace_str Namespace name
- * @param key_list Array of string pointers to fill
- * @param max_keys Maximum number of keys to return
- * @param actual_keys[out] Actual number of keys returned
- * @return ESP_OK on success, error code on failure
- */
-esp_err_t config_enumerate_keys(const char* namespace_str, const char* key_list[], 
-                                size_t max_keys, size_t* actual_keys);
+esp_err_t config_set_parameter(const char* namespace_str, const char* key,
+                               const void* value, size_t value_size, bool persist);
 
 // =============================================================================
 // Configuration Defaults and Factory Reset
