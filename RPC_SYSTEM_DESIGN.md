@@ -6,27 +6,24 @@ This document outlines the design for a Remote Procedure Call (RPC) system for t
 
 ## Goals
 
-1. **Multi-transport support**: Bluetooth, WiFi, and Serial (UART)
-2. **Non-blocking operation**: Run on separate CPU core to avoid interfering with main control loop
+1. **Bluetooth-first implementation**: Start with Bluetooth Classic for simplicity and debugging
+2. **Single-core operation**: Run on same core as main control loop initially (Core 1)
 3. **Betaflight-inspired commands**: Simple, text-based commands for ease of use
 4. **Configuration integration**: Seamless integration with the hybrid configuration system
 5. **Robot control**: Direct joint and leg control for testing and debugging
 6. **Performance**: Bulk operations for efficient data transfer
+7. **Future extensibility**: Design for easy addition of WiFi/Serial transports later
 
-## Architecture Overview
+## Architecture Overview (Phase 1: Bluetooth-Only)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        RPC System (Core 0)                     │
+│                    RPC System (Core 1)                         │
 ├─────────────────────────────────────────────────────────────────┤
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
-│  │   Bluetooth     │  │      WiFi       │  │     Serial      │ │
-│  │   Transport     │  │   Transport     │  │   Transport     │ │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘ │
-│           │                     │                     │         │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │                Transport Abstraction Layer                  │ │
-│  └─────────────────────────────────────────────────────────────┘ │
+│  ┌─────────────────┐                                           │
+│  │   Bluetooth     │                                           │
+│  │   Classic SPP   │                                           │
+│  └─────────────────┘                                           │
 │           │                                                     │
 │  ┌─────────────────────────────────────────────────────────────┐ │
 │  │                Command Parser & Dispatcher                  │ │
@@ -35,20 +32,51 @@ This document outlines the design for a Remote Procedure Call (RPC) system for t
 │  ┌────────────────────┬────────────────────┬───────────────────┐ │
 │  │   Config Commands  │  Control Commands  │  System Commands  │ │
 │  └────────────────────┴────────────────────┴───────────────────┘ │
+│                                │                                 │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
+│  │ Configuration   │  │ Robot Control   │  │ System Status   │ │
+│  │ Manager         │  │ (Legs/Joints)   │  │ & Diagnostics   │ │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘ │
 └─────────────────────────────────────────────────────────────────┘
-           │                     │                     │
-┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
-│ Configuration   │  │ Robot Control   │  │ System Status   │
-│ Manager         │  │ (Legs/Joints)   │  │ & Diagnostics   │
-│ (Core 1)        │  │ (Core 1)        │  │ (Core 1)        │
-└─────────────────┘  └─────────────────┘  └─────────────────┘
 ```
 
-## Transport Layer Design
+## Transport Layer Design (Phase 1: Bluetooth Only)
 
-### 1. Transport Abstraction
+### 1. Bluetooth Classic Implementation
 
 ```c
+// Simple Bluetooth RPC interface
+typedef struct {
+    bool is_connected;
+    esp_spp_cb_param_t spp_param;
+    uint32_t handle;
+    char rx_buffer[256];
+    size_t rx_len;
+} rpc_bluetooth_t;
+
+// Core functions
+esp_err_t rpc_bluetooth_init(void);
+bool rpc_bluetooth_is_connected(void);
+int rpc_bluetooth_send(const char* data, size_t len);
+int rpc_bluetooth_receive(char* buffer, size_t max_len);
+```
+
+### 2. Bluetooth Classic Configuration
+
+- **Protocol**: Bluetooth Serial Port Profile (SPP)
+- **Service Name**: "Hexapod RPC"
+- **Device Name**: Configurable (default: "Hexapod-XXXXXX")
+- **Connection**: Single client connection
+- **Buffer size**: 256 bytes (SPP limit)
+- **Latency**: ~10-20ms (excellent for real-time tuning)
+- **Auto-reconnect**: Support automatic reconnection
+
+### 3. Future Transport Abstraction (Phase 2+)
+
+When adding WiFi/Serial support later, we'll implement:
+
+```c
+// Future transport abstraction (not implemented in Phase 1)
 typedef enum {
     RPC_TRANSPORT_BLUETOOTH = 0,
     RPC_TRANSPORT_WIFI_TCP,
@@ -65,33 +93,6 @@ typedef struct {
     esp_err_t (*deinit)(void);
 } rpc_transport_t;
 ```
-
-### 2. Multi-Transport Manager
-
-- **Concurrent listening**: All transports active simultaneously
-- **Priority handling**: Bluetooth > WiFi > Serial (configurable)
-- **Connection management**: Auto-detect active connections
-- **Buffer management**: Per-transport receive/send buffers
-
-### 3. Transport Implementations
-
-#### Bluetooth Classic (Primary)
-- **Protocol**: Bluetooth Serial Port Profile (SPP)
-- **Connection**: Automatic pairing with known devices
-- **Buffer size**: 256 bytes (typical BT classic limit)
-- **Latency**: ~10-20ms (excellent for real-time tuning)
-
-#### WiFi TCP (Secondary)
-- **Protocol**: TCP socket server on configurable port (default: 5760)
-- **Connection**: Multiple concurrent clients supported
-- **Buffer size**: 1024 bytes (higher throughput)
-- **Latency**: ~5-50ms depending on network
-
-#### Serial UART (Fallback)
-- **Protocol**: Standard UART (115200 baud default)
-- **Connection**: Direct USB/UART connection
-- **Buffer size**: 128 bytes
-- **Latency**: ~1-5ms (lowest latency, highest reliability)
 
 ## Command Protocol Design
 
@@ -235,19 +236,26 @@ import system: 2 parameters updated
 OK
 ```
 
-## Core Assignment Strategy
+## Core Assignment Strategy (Phase 1: Single Core)
 
-### Core 0 (Protocol Core)
-- **RPC System**: Command parsing, response generation
-- **Transport Management**: Bluetooth, WiFi, Serial handling  
-- **Buffer Management**: Receive/transmit queues
-- **Command Dispatch**: Route commands to Core 1 handlers
-
-### Core 1 (Application Core)
+### Core 1 (Main Application Core)
 - **Main Control Loop**: Robot locomotion and control
+- **RPC System**: Bluetooth handling, command parsing, response generation
 - **Configuration System**: NVS operations and parameter management
 - **Robot Control**: Joint control, inverse kinematics, gait patterns
 - **System Monitoring**: Status reporting, diagnostics
+
+### Integration Approach
+- **Non-blocking RPC**: Process commands during main loop idle time
+- **Priority**: Robot control takes priority over RPC commands
+- **Safety**: Emergency stop and safety checks always active
+- **Buffering**: Queue incoming commands, process during safe windows
+
+### Future Multi-Core Support (Phase 2+)
+When performance requires it, we can move RPC to Core 0:
+- **Core 0**: RPC system, transport management, command parsing
+- **Core 1**: Robot control, configuration, system monitoring
+- **Inter-core communication**: FreeRTOS queues for command dispatch
 
 ## Performance Considerations
 
@@ -264,33 +272,34 @@ OK
 ### 3. Memory Management
 - **Static allocation**: Avoid malloc/free in real-time paths
 - **Buffer pools**: Pre-allocated command/response buffers
-- **Stack optimization**: Minimize stack usage on both cores
+- **Stack optimization**: Minimize stack usage in single-core design
+- **Shared resources**: Careful sharing between RPC and robot control
 
 ## Implementation Phases
 
-### Phase 1: Core Infrastructure
-1. Transport abstraction layer
-2. Command parser and dispatcher
-3. Inter-core communication queues
-4. Basic configuration commands (get/set)
+### Phase 1: Bluetooth RPC Foundation
+1. Bluetooth Classic SPP setup
+2. Simple command parser and dispatcher
+3. Basic configuration commands (get/set/export/import)
+4. Single-core integration with main loop
 
 ### Phase 2: Configuration Integration  
 1. Bulk configuration operations
-2. Namespace enumeration
-3. Parameter metadata access
-4. Save/load operations
+2. Namespace enumeration and parameter discovery
+3. Parameter metadata access and validation
+4. Save/reload/factory-reset operations
 
-### Phase 3: Robot Control
+### Phase 3: Robot Control Commands
 1. Direct joint control commands
-2. Leg positioning commands  
+2. Leg positioning commands (inverse kinematics)
 3. Safety interlocks and validation
-4. Status reporting
+4. System status reporting
 
 ### Phase 4: Advanced Features
-1. Multiple transport support
-2. Streaming telemetry
-3. Authentication and security
-4. Performance optimization
+1. Transport abstraction layer (add WiFi/Serial)
+2. Multi-core implementation (move RPC to Core 0)
+3. Streaming telemetry and real-time data
+4. Authentication and security features
 
 ## Future Extensions
 
