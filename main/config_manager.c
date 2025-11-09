@@ -531,11 +531,11 @@ static const config_param_info_t g_system_param_table[] = {
     },
     {
         .name = "auto_disarm_timeout",
-        .type = CONFIG_TYPE_INT32,
+        .type = CONFIG_TYPE_UINT32,
         .offset = offsetof(system_config_t, auto_disarm_timeout),
         .size = sizeof(uint32_t),
         .description = "Auto-disarm timeout in seconds",
-        .constraints = { .int_range = { 5, 300 } }
+        .constraints = { .uint_range = { 5, 300 } }
     },
     {
         .name = "safety_voltage_min",
@@ -555,27 +555,27 @@ static const config_param_info_t g_system_param_table[] = {
     },
     {
         .name = "motion_timeout_ms",
-        .type = CONFIG_TYPE_INT32,
+        .type = CONFIG_TYPE_UINT32,
         .offset = offsetof(system_config_t, motion_timeout_ms),
         .size = sizeof(uint32_t),
         .description = "Motion command timeout in milliseconds",
-        .constraints = { .int_range = { 100, 5000 } }
+        .constraints = { .uint_range = { 100, 5000 } }
     },
     {
         .name = "startup_delay_ms",
-        .type = CONFIG_TYPE_INT32,
+        .type = CONFIG_TYPE_UINT32,
         .offset = offsetof(system_config_t, startup_delay_ms),
         .size = sizeof(uint32_t),
         .description = "Startup safety delay in milliseconds",
-        .constraints = { .int_range = { 0, 10000 } }
+        .constraints = { .uint_range = { 0, 10000 } }
     },
     {
         .name = "max_control_frequency",
-        .type = CONFIG_TYPE_INT32,
+        .type = CONFIG_TYPE_UINT32,
         .offset = offsetof(system_config_t, max_control_frequency),
         .size = sizeof(uint32_t),
         .description = "Maximum control loop frequency in Hz",
-        .constraints = { .int_range = { 50, 1000 } }
+        .constraints = { .uint_range = { 50, 1000 } }
     },
     {
         .name = "robot_id",
@@ -595,11 +595,11 @@ static const config_param_info_t g_system_param_table[] = {
     },
     {
         .name = "config_version",
-        .type = CONFIG_TYPE_INT32,
+        .type = CONFIG_TYPE_UINT16,
         .offset = offsetof(system_config_t, config_version),
         .size = sizeof(uint16_t),
         .description = "Configuration schema version",
-        .constraints = { .int_range = { 1, 65535 } }
+        .constraints = { .uint_range = { 1, 65535 } }
     }
 };
 
@@ -734,6 +734,71 @@ esp_err_t hexapod_config_set_int32(const char* namespace_str, const char* param_
         
         ESP_LOGD(TAG, "Set %s.%s = %ld %s", namespace_str, param_name, 
                  (long)value, persist ? "(persistent)" : "(memory-only)");
+        
+        if (persist) {
+            return config_manager_save_namespace(CONFIG_NS_SYSTEM);
+        }
+        return ESP_OK;
+    }
+    
+    return ESP_ERR_NOT_FOUND;
+}
+
+esp_err_t hexapod_config_get_uint32(const char* namespace_str, const char* param_name, uint32_t* value) {
+    if (!namespace_str || !param_name || !value) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    if (strcmp(namespace_str, "system") == 0) {
+        const config_param_info_t* param = find_system_param(param_name);
+        if (!param || (param->type != CONFIG_TYPE_UINT32 && param->type != CONFIG_TYPE_UINT16)) {
+            return ESP_ERR_NOT_FOUND;
+        }
+        
+        if (param->type == CONFIG_TYPE_UINT32) {
+            uint32_t* param_ptr = (uint32_t*)get_system_param_ptr(param);
+            *value = *param_ptr;
+        } else { // CONFIG_TYPE_UINT16
+            uint16_t* param_ptr = (uint16_t*)get_system_param_ptr(param);
+            *value = (uint32_t)*param_ptr;
+        }
+        return ESP_OK;
+    }
+    
+    return ESP_ERR_NOT_FOUND;
+}
+
+esp_err_t hexapod_config_set_uint32(const char* namespace_str, const char* param_name, uint32_t value, bool persist) {
+    if (!namespace_str || !param_name) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    if (strcmp(namespace_str, "system") == 0) {
+        const config_param_info_t* param = find_system_param(param_name);
+        if (!param || (param->type != CONFIG_TYPE_UINT32 && param->type != CONFIG_TYPE_UINT16)) {
+            return ESP_ERR_NOT_FOUND;
+        }
+        
+        // Validate constraints
+        if (value < param->constraints.uint_range.min || value > param->constraints.uint_range.max) {
+            ESP_LOGE(TAG, "Value %lu for %s.%s out of range [%lu, %lu]", 
+                     (unsigned long)value, namespace_str, param_name,
+                     (unsigned long)param->constraints.uint_range.min, 
+                     (unsigned long)param->constraints.uint_range.max);
+            return ESP_ERR_INVALID_ARG;
+        }
+        
+        if (param->type == CONFIG_TYPE_UINT32) {
+            uint32_t* param_ptr = (uint32_t*)get_system_param_ptr(param);
+            *param_ptr = value;
+        } else { // CONFIG_TYPE_UINT16
+            uint16_t* param_ptr = (uint16_t*)get_system_param_ptr(param);
+            *param_ptr = (uint16_t)value;
+        }
+        g_manager_state.namespace_dirty[CONFIG_NS_SYSTEM] = true;
+        
+        ESP_LOGD(TAG, "Set %s.%s = %lu %s", namespace_str, param_name, 
+                 (unsigned long)value, persist ? "(persistent)" : "(memory-only)");
         
         if (persist) {
             return config_manager_save_namespace(CONFIG_NS_SYSTEM);
@@ -1033,6 +1098,12 @@ esp_err_t config_set_parameter(const char* namespace_str, const char* key,
                 break;
             case CONFIG_TYPE_INT32:
                 err = hexapod_config_set_int32(namespace_str, key, *(const int32_t*)value, persist);
+                break;
+            case CONFIG_TYPE_UINT32:
+                err = hexapod_config_set_uint32(namespace_str, key, *(const uint32_t*)value, persist);
+                break;
+            case CONFIG_TYPE_UINT16:
+                err = hexapod_config_set_uint32(namespace_str, key, *(const uint16_t*)value, persist);
                 break;
             case CONFIG_TYPE_FLOAT:
                 err = hexapod_config_set_float(namespace_str, key, *(const float*)value, persist);

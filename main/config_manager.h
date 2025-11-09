@@ -134,6 +134,8 @@ esp_err_t config_set_system(const system_config_t* config);
 typedef enum {
     CONFIG_TYPE_BOOL = 0,
     CONFIG_TYPE_INT32,
+    CONFIG_TYPE_UINT16,
+    CONFIG_TYPE_UINT32,
     CONFIG_TYPE_FLOAT,
     CONFIG_TYPE_STRING,
     CONFIG_TYPE_COUNT
@@ -147,6 +149,7 @@ typedef struct {
     const char* description;           // Human-readable description
     union {
         struct { int32_t min, max; } int_range;
+        struct { uint32_t min, max; } uint_range;
         struct { float min, max; } float_range;
         struct { size_t max_length; } string;
     } constraints;
@@ -197,6 +200,27 @@ esp_err_t hexapod_config_get_int32(const char* namespace_str, const char* param_
  * @return ESP_OK on success, error code on failure
  */
 esp_err_t hexapod_config_set_int32(const char* namespace_str, const char* param_name, int32_t value, bool persist);
+
+/**
+ * @brief Get unsigned 32-bit integer parameter value
+ * 
+ * @param namespace_str Namespace name
+ * @param param_name Parameter name
+ * @param[out] value Pointer to store the value
+ * @return ESP_OK on success, error code on failure
+ */
+esp_err_t hexapod_config_get_uint32(const char* namespace_str, const char* param_name, uint32_t* value);
+
+/**
+ * @brief Set unsigned 32-bit integer parameter value
+ * 
+ * @param namespace_str Namespace name
+ * @param param_name Parameter name
+ * @param value New value
+ * @param persist true to save to NVS, false for memory-only
+ * @return ESP_OK on success, error code on failure
+ */
+esp_err_t hexapod_config_set_uint32(const char* namespace_str, const char* param_name, uint32_t value, bool persist);
 
 /**
  * @brief Get float parameter value
@@ -290,7 +314,7 @@ esp_err_t config_get_parameter_info(const char* namespace_str, const char* param
  * @param value_size Size of value buffer
  * @return ESP_OK on success, error code on failure
  * 
- * @note Prefer type-specific functions (hexapod_config_get_bool, hexapod_config_get_int32, etc.)
+ * @note Prefer type-specific functions (hexapod_config_get_bool, hexapod_config_get_int32, hexapod_config_get_uint32, etc.)
  */
 esp_err_t config_get_parameter(const char* namespace_str, const char* key, 
                                void* value_out, size_t value_size);
@@ -305,7 +329,7 @@ esp_err_t config_get_parameter(const char* namespace_str, const char* key,
  * @param persist true to save to NVS, false for memory-only
  * @return ESP_OK on success, error code on failure
  * 
- * @note Prefer type-specific functions (hexapod_config_set_bool, hexapod_config_set_int32, etc.)
+ * @note Prefer type-specific functions (hexapod_config_set_bool, hexapod_config_set_int32, hexapod_config_set_uint32, etc.)
  */
 esp_err_t config_set_parameter(const char* namespace_str, const char* key,
                                const void* value, size_t value_size, bool persist);
