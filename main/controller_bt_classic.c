@@ -17,7 +17,7 @@
 
 #include "controller_internal.h"
 #include "controller_bt_classic.h"
-#include "rpc_commands.h"
+#include "rpc_transport.h"
 
 static const char *TAG = "ctrl_bt";
 
@@ -167,8 +167,8 @@ static void esp_spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t *param) {
             if (l >= 2 && d[0] == BT_CTRL_SYNC0 && d[1] == BT_CTRL_SYNC1) {
                 process_frame_data(d, l);
             } else {
-                // Treat as RPC textual data
-                rpc_feed_bytes(d, l);
+                // Send RPC data to transport queue
+                rpc_transport_rx_send(RPC_TRANSPORT_BLUETOOTH, d, l);
             }
         }
         break;
@@ -292,6 +292,9 @@ void controller_driver_init_bt_classic(const struct controller_config_s *core) {
     
     // Start watchdog task
     xTaskCreate(bt_watchdog_task, "bt_watchdog", 2048, NULL, 5, NULL);
+    
+    // Register RPC transport sender
+    rpc_transport_register_sender(RPC_TRANSPORT_BLUETOOTH, controller_bt_classic_send_raw);
     
     ESP_LOGI(TAG, "BT Classic controller ready (PIN: %04"PRIu32")", g_config.pin_code);
 }

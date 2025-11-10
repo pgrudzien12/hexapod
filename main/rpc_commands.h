@@ -1,11 +1,12 @@
 #pragma once
 /*
- * Minimal Bluetooth-only RPC command parser (Phase 1)
+ * RPC command parser with transport abstraction
  * Supports basic configuration inspection/modification and system operations.
  */
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "rpc_transport.h"
 
 #ifdef __cplusplus
 extern "C" { 

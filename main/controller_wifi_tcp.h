@@ -49,6 +49,10 @@ static inline controller_wifi_tcp_cfg_t controller_wifi_tcp_default(void) {
     return c;
 }
 
+// Send raw textual data over active TCP connection (for RPC responses)
+// Returns ESP_OK on success, ESP_FAIL if no active client or send error
+esp_err_t controller_wifi_tcp_send_raw(const char *data, size_t len);
+
 #ifdef __cplusplus
 }
 #endif

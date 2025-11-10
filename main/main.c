@@ -20,9 +20,11 @@
 #include <string.h>
 #include "wifi_ap.h"
 #include "controller_bt_classic.h"
+#include "controller_wifi_tcp.h"
 #include "kpp_system.h"
 #include "kpp_debug.h"
 #include "config_manager.h"
+#include "rpc_commands.h"
 
 static const char *TAG = "leg";
 
@@ -50,13 +52,15 @@ void gait_framework_main(void *arg)
     // user_command_init();
     
     // Initialize Bluetooth Classic controller driver
-    controller_bt_classic_cfg_t bt_cfg = controller_bt_classic_default();
+    // controller_bt_classic_cfg_t bt_cfg = controller_bt_classic_default();
+    // Initialize WiFi TCP controller driver
+    controller_wifi_tcp_cfg_t wifi_cfg = controller_wifi_tcp_default();
     controller_config_t ctrl_cfg = {
-        .driver_type = CONTROLLER_DRIVER_BT_CLASSIC,
+        .driver_type = CONTROLLER_DRIVER_WIFI_TCP,
         .task_stack = 4096,
         .task_prio = 10,
-        .driver_cfg = &bt_cfg,
-        .driver_cfg_size = sizeof(bt_cfg)
+        .driver_cfg = &wifi_cfg,
+        .driver_cfg_size = sizeof(wifi_cfg)
     };
     controller_init(&ctrl_cfg);
 
@@ -126,8 +130,11 @@ void app_main(void)
         vTaskDelay(pdMS_TO_TICKS(sys_config->startup_delay_ms));
     }
     
+    // Initialize RPC system
+    rpc_init();
+    
     // Bring up WiFi AP early so that network-based controller drivers or diagnostics
     // can connect even if later initialization stalls. Uses default options (MAC suffix).
-    // wifi_ap_init_once();
+    wifi_ap_init_once();
     gait_framework_main(NULL);
 }

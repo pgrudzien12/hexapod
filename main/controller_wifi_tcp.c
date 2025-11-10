@@ -10,12 +10,21 @@
 #include "esp_log.h"
 #include "lwip/errno.h"
 #include "lwip/sockets.h"
+#include "lwip/tcpip.h"
+#include "lwip/ip_addr.h"
 
 #include "controller_internal.h"
 #include "controller_wifi_tcp.h"
 #include "wifi_ap.h"
+#include "rpc_transport.h"
+#include "esp_netif.h"
+#include "esp_netif_ip_addr.h"
+#include "esp_netif_types.h"
 
 static const char *TAG = "ctrl_wifi";
+
+// Global state for RPC over WiFi TCP
+static int g_active_client_sock = -1;
 
 // CRC16-CCITT (poly 0x1021, init 0xFFFF, no reflect, no xor-out)
 static uint16_t crc16_ccitt(const uint8_t *data, size_t len) {
@@ -44,6 +53,7 @@ static bool read_full(int sock, uint8_t *buf, size_t n, int timeout_ms) {
 
 static void wifi_tcp_client_task(void *arg) {
     int client_sock = (int)(intptr_t)arg;
+    g_active_client_sock = client_sock;
     controller_internal_set_connected(true);
     ESP_LOGI(TAG, "client connected fd=%d", client_sock);
 
@@ -61,9 +71,13 @@ static void wifi_tcp_client_task(void *arg) {
             }
             continue; // allow timeout logic
         }
+        
+        // Check if this is a binary control frame or RPC text
         if (header[0] != WIFI_CTRL_SYNC0 || header[1] != WIFI_CTRL_SYNC1) {
-            ESP_LOGW(TAG, "bad sync %02X %02X", header[0], header[1]);
-            break;
+            // Send RPC data to transport queue
+            rpc_transport_rx_send(RPC_TRANSPORT_WIFI_TCP, header, WIFI_CTRL_BASE_HEADER);
+            last_frame = xTaskGetTickCount();
+            continue;
         }
         uint8_t ver = header[2];
         if (ver != WIFI_CTRL_PROTO_VERSION) {
@@ -72,6 +86,8 @@ static void wifi_tcp_client_task(void *arg) {
         }
         uint8_t flags = header[3];
         uint16_t seq = (uint16_t)(header[4] | (header[5] << 8));
+        (void)flags; // Suppress unused variable warning
+        (void)seq;   // Suppress unused variable warning
         uint16_t payload_len = (uint16_t)(header[6] | (header[7] << 8));
         if (payload_len != WIFI_CTRL_CHANNEL_BYTES) {
             ESP_LOGW(TAG, "unexpected payload_len=%u", (unsigned)payload_len);
@@ -111,6 +127,9 @@ static void wifi_tcp_client_task(void *arg) {
     }
 
     close(client_sock);
+    if (g_active_client_sock == client_sock) {
+        g_active_client_sock = -1;
+    }
     controller_internal_set_connected(false);
     controller_internal_set_failsafe();
     ESP_LOGI(TAG, "client closed");
@@ -124,6 +143,59 @@ static void wifi_tcp_server_task(void *arg) {
     if (ssid) {
         ESP_LOGI(TAG, "WiFi AP active SSID=%s", ssid);
     }
+    
+    // Wait for WiFi AP to be fully ready and TCP/IP stack initialized
+    ESP_LOGI(TAG, "Waiting for network stack to be ready...");
+    
+    // Wait for network interface to be available and have an IP
+    esp_netif_t* netif = NULL;
+    esp_netif_ip_info_t ip_info;
+    int retry_count = 0;
+    const int max_retries = 50; // 5 seconds total
+    
+    while (retry_count < max_retries) {
+        vTaskDelay(pdMS_TO_TICKS(100));
+        
+        // Try to get the WiFi AP network interface
+        netif = esp_netif_get_default_netif();
+        if (netif == NULL) {
+            // Try alternative method to get WiFi AP interface by iterating
+            esp_netif_t *netif_iter = NULL;
+            while ((netif_iter = esp_netif_next_unsafe(netif_iter)) != NULL) {
+                // Check if this is a WiFi AP interface by examining the description
+                const char* desc = esp_netif_get_desc(netif_iter);
+                if (desc && strstr(desc, "ap") != NULL) {
+                    netif = netif_iter;
+                    ESP_LOGI(TAG, "Found WiFi AP interface: %s", desc);
+                    break;
+                }
+            }
+        }
+        
+        if (netif != NULL) {
+            // Check if it has an IP address configured
+            esp_err_t ret = esp_netif_get_ip_info(netif, &ip_info);
+            if (ret == ESP_OK && ip_info.ip.addr != 0) {
+                ESP_LOGI(TAG, "WiFi AP network interface ready with IP: " IPSTR, 
+                        IP2STR(&ip_info.ip));
+                break;
+            }
+        }
+        retry_count++;
+        
+        if (retry_count % 10 == 0) {
+            ESP_LOGI(TAG, "Still waiting for WiFi AP network interface... (%d/%d)", retry_count, max_retries);
+        }
+    }
+    
+    if (netif == NULL || ip_info.ip.addr == 0) {
+        ESP_LOGE(TAG, "Failed to get WiFi AP network interface or IP after %d retries", retry_count);
+        vTaskDelete(NULL);
+        return;
+    }
+    
+    ESP_LOGI(TAG, "Network interface ready, waiting additional time for TCP/IP stack...");
+    vTaskDelay(pdMS_TO_TICKS(1000)); // Additional wait for TCP/IP stack
     size_t cfg_sz=0; const void *p = controller_internal_get_driver_cfg(&cfg_sz);
     controller_wifi_tcp_cfg_t local = controller_wifi_tcp_default();
     const controller_wifi_tcp_cfg_t *cfg = &local;
@@ -155,6 +227,9 @@ static void wifi_tcp_server_task(void *arg) {
         return;
     }
     ESP_LOGI(TAG, "WiFi controller listening on port %u", (unsigned)cfg->listen_port);
+    
+    // Register RPC transport sender
+    rpc_transport_register_sender(RPC_TRANSPORT_WIFI_TCP, controller_wifi_tcp_send_raw);
 
     while (1) {
         struct sockaddr_in caddr; socklen_t clen = sizeof(caddr);
@@ -171,4 +246,16 @@ static void wifi_tcp_server_task(void *arg) {
 
 void controller_driver_init_wifi_tcp(const controller_config_t *core) {
     xTaskCreate(wifi_tcp_server_task, "ctrl_wifi_srv", core->task_stack, NULL, core->task_prio, NULL);
+}
+
+esp_err_t controller_wifi_tcp_send_raw(const char *data, size_t len) {
+    if (g_active_client_sock < 0 || !data || len == 0) {
+        return ESP_FAIL;
+    }
+    
+    ssize_t sent = send(g_active_client_sock, data, len, 0);
+    if (sent < 0 || (size_t)sent != len) {
+        return ESP_FAIL;
+    }
+    return ESP_OK;
 }

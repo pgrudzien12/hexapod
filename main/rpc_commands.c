@@ -13,10 +13,11 @@
  */
 
 #include "rpc_commands.h"
-#include "controller_bt_classic.h"
+#include "rpc_transport.h"
 #include "config_manager.h"
 #include "esp_system.h"
 #include "esp_log.h"
+#include "esp_err.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -28,6 +29,7 @@ static const char *TAG = "rpc"; // used for logging
 static char line_buf[256];
 static size_t line_len = 0;
 static rpc_send_fn_t g_send_cb = NULL;
+static rpc_transport_type_t g_active_transport = RPC_TRANSPORT_BLUETOOTH;
 
 static void rpc_send(const char *fmt, ...) {
 	char stack_buf[256];
@@ -39,7 +41,11 @@ static void rpc_send(const char *fmt, ...) {
 		size_t len = (size_t)needed;
 		if (len >= sizeof(stack_buf)-2) len = sizeof(stack_buf)-3;
 		stack_buf[len++]='\r'; stack_buf[len++]='\n'; stack_buf[len]='\0';
-		if (g_send_cb) g_send_cb(stack_buf); else controller_bt_classic_send_raw(stack_buf, len);
+		if (g_send_cb) {
+			g_send_cb(stack_buf);
+		} else {
+			rpc_transport_tx_send(g_active_transport, stack_buf, len);
+		}
 	} else {
 		// Allocate exact size (+CRLF)
 		size_t len_total = (size_t)needed + 3; // CRLF + null
@@ -47,7 +53,11 @@ static void rpc_send(const char *fmt, ...) {
 		if (!dyn) {
 			// Fallback truncated
 			size_t len = sizeof(stack_buf)-3; stack_buf[len++]='\r'; stack_buf[len++]='\n'; stack_buf[len]='\0';
-			if (g_send_cb) g_send_cb(stack_buf); else controller_bt_classic_send_raw(stack_buf, len);
+			if (g_send_cb) {
+				g_send_cb(stack_buf);
+			} else {
+				rpc_transport_tx_send(g_active_transport, stack_buf, len);
+			}
 			return;
 		}
 		va_list ap2; va_start(ap2, fmt);
@@ -55,20 +65,48 @@ static void rpc_send(const char *fmt, ...) {
 		va_end(ap2);
 		size_t l = strlen(dyn);
 		dyn[l++]='\r'; dyn[l++]='\n'; dyn[l]='\0';
-		if (g_send_cb) g_send_cb(dyn); else controller_bt_classic_send_raw(dyn, l);
+		if (g_send_cb) {
+			g_send_cb(dyn);
+		} else {
+			rpc_transport_tx_send(g_active_transport, dyn, l);
+		}
 		free(dyn);
 	}
 }
 
 void rpc_set_send_callback(rpc_send_fn_t fn) { g_send_cb = fn; }
 
-void rpc_init(void) {
-	line_len = 0;
-	ESP_LOGI(TAG, "RPC initialized");
-	rpc_send("# RPC ready");
+static void rpc_processing_task(void* param) {
+    ESP_LOGI(TAG, "RPC processing task started");
+    
+    while (1) {
+        rpc_rx_message_t msg;
+        esp_err_t err = rpc_transport_rx_receive(&msg, 1000); // 1 second timeout
+        
+        if (err == ESP_OK) {
+            // Set active transport for responses
+            g_active_transport = msg.transport;
+            // Process the received data
+            rpc_feed_bytes(msg.data, msg.len);
+        }
+    }
 }
 
-static void trim(char *s) {
+void rpc_init(void) {
+    line_len = 0;
+    
+    // Initialize transport layer
+    esp_err_t err = rpc_transport_init();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize RPC transport: %s", esp_err_to_name(err));
+        return;
+    }
+    
+    // Start RPC processing task
+    xTaskCreate(rpc_processing_task, "rpc_proc", 4096, NULL, 6, NULL);
+    
+    ESP_LOGI(TAG, "RPC initialized");
+}static void trim(char *s) {
 	// remove leading/trailing whitespace
 	char *start = s; while (*start && isspace((unsigned char)*start)) start++;
 	char *end = start + strlen(start); while (end>start && isspace((unsigned char)end[-1])) --end; *end='\0';

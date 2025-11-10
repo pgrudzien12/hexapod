@@ -2,6 +2,7 @@
  #include "esp_wifi.h"
  #include "esp_event.h"
  #include "esp_log.h"
+ #include "esp_netif.h"
  #include "nvs_flash.h"
  #include "esp_system.h"
  #include "esp_random.h"
@@ -58,7 +59,14 @@ bool wifi_ap_init_with_options(const wifi_ap_options_t *opt) {
         nvs_flash_erase();
         nvs_flash_init();
     }
+    
+    // Initialize network interface layer
+    ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
+    
+    // Create default WiFi AP network interface
+    esp_netif_create_default_wifi_ap();
+    
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
