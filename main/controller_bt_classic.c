@@ -17,6 +17,7 @@
 
 #include "controller_internal.h"
 #include "controller_bt_classic.h"
+#include "rpc_commands.h"
 
 static const char *TAG = "ctrl_bt";
 
@@ -160,7 +161,15 @@ static void esp_spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t *param) {
         
     case ESP_SPP_DATA_IND_EVT:
         if (param->data_ind.handle == g_spp_handle) {
-            process_frame_data(param->data_ind.data, param->data_ind.len);
+            const uint8_t *d = param->data_ind.data;
+            size_t l = param->data_ind.len;
+            // Detect binary control frame vs ASCII RPC text
+            if (l >= 2 && d[0] == BT_CTRL_SYNC0 && d[1] == BT_CTRL_SYNC1) {
+                process_frame_data(d, l);
+            } else {
+                // Treat as RPC textual data
+                rpc_feed_bytes(d, l);
+            }
         }
         break;
         
@@ -289,4 +298,12 @@ void controller_driver_init_bt_classic(const struct controller_config_s *core) {
 
 const char *controller_bt_get_device_name(void) {
     return g_device_name[0] ? g_device_name : NULL;
+}
+
+esp_err_t controller_bt_classic_send_raw(const char *data, size_t len) {
+    if (!g_connected || g_spp_handle == 0 || !data || len == 0) {
+        return ESP_FAIL;
+    }
+    esp_err_t ret = esp_spp_write(g_spp_handle, len, (uint8_t*)data);
+    return ret == ESP_OK ? ESP_OK : ret;
 }

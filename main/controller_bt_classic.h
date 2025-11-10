@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "esp_err.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -37,6 +38,10 @@ void controller_driver_init_bt_classic(const struct controller_config_s *core);
 
 // Get the active Bluetooth device name (NULL if not started yet)
 const char *controller_bt_get_device_name(void);
+
+// Send raw textual data over active SPP connection (for RPC responses)
+// Returns ESP_OK on success, ESP_FAIL if not connected.
+esp_err_t controller_bt_classic_send_raw(const char *data, size_t len);
 
 #ifdef __cplusplus
 }

@@ -12,6 +12,7 @@ idf_component_register(
     "controller_flysky_ibus.c"
     "controller_wifi_tcp.c"
     "controller_bt_classic.c"
+    "rpc_commands.c"
     "wifi_ap.c"
     "kpp_system.c"
     "kpp_forward_kin.c"
