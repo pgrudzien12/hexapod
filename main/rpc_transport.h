@@ -23,6 +23,7 @@ typedef enum {
     RPC_TRANSPORT_BLUETOOTH = 0,
     RPC_TRANSPORT_WIFI_TCP,
     RPC_TRANSPORT_SERIAL,
+    RPC_TRANSPORT_INTERNAL, // For in-process commands
     RPC_TRANSPORT_COUNT
 } rpc_transport_type_t;
 

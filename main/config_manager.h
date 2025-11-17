@@ -15,6 +15,7 @@
 #include <stddef.h>
 #include "esp_err.h"
 #include "nvs_flash.h"
+#include "controller.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -50,6 +51,7 @@ typedef struct {
     char robot_id[32];               // Unique robot identifier
     char robot_name[64];             // Human-readable robot name
     uint16_t config_version;         // Configuration schema version
+    controller_driver_type_e controller_type; // Default controller driver
 } system_config_t;
 
 // =============================================================================

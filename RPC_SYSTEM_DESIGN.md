@@ -87,14 +87,14 @@ esp_err_t rpc_transport_register_sender(rpc_transport_type_t transport, rpc_tran
 - **Device Name**: "HEXAPOD_XXXXXX" (MAC-derived suffix)
 - **PIN**: Configurable (default: 1234)
 - **Integration**: Queue-based RX/TX via transport abstraction
-- **Binary Frame Detection**: Automatically routes binary control frames vs RPC text
+- **RPC Only**: The transport no longer distinguishes between binary and text frames. All data is treated as potential RPC commands.
 
 ### 3. ✅ WiFi TCP Integration (Implemented)
 
 - **Protocol**: TCP server on configurable port (default: 5555)
 - **Connection**: Single client connection per transport
 - **Integration**: Queue-based RX/TX via transport abstraction  
-- **Binary Frame Detection**: Automatically routes binary control frames vs RPC text
+- **RPC Only**: The transport no longer distinguishes between binary and text frames. All data is treated as potential RPC commands.
 
 ### 4. 🔲 Serial UART (Planned)
 
@@ -181,6 +181,8 @@ OK
 🔲 gait <type> <speed>                  # Start gait pattern  
 🔲 stop                                 # Emergency stop
 🔲 home                                 # Move all legs to home position
+✅ set controller <ch0> ... <ch31>      # Update controller channels
+✅ set controller <ch0> ... <ch31>      # Update controller channels
 ```
 
 #### 🔲 System Commands (Planned)

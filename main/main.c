@@ -49,18 +49,25 @@ void gait_framework_main(void *arg)
     gait_scheduler_init(&scheduler, 1.5f); // 1.5 second cycle time
     swing_trajectory_init(&trajectory, 0.07f, 0.04f); // 7cm step, 4cm clearance
     robot_config_init_default();
-    // user_command_init();
     
-    // Initialize WiFi TCP RPC server
-    wifi_tcp_rpc_init(4096, 10);
+    // Initialize the controller based on system configuration
+    const system_config_t* sys_cfg = config_get_system();
     controller_config_t ctrl_cfg = {
-        .driver_type = CONTROLLER_DRIVER_WIFI_TCP,
+        .driver_type = sys_cfg->controller_type,
         .task_stack = 4096,
         .task_prio = 10,
-        .driver_cfg = 0,
-        .driver_cfg_size = 0
     };
+
+    // Assign driver-specific configuration if needed
+    controller_wifi_tcp_cfg_t wifi_cfg;
+    if (sys_cfg->controller_type == CONTROLLER_DRIVER_WIFI_TCP) {
+        wifi_cfg = controller_wifi_tcp_default();
+        ctrl_cfg.driver_cfg = &wifi_cfg;
+        ctrl_cfg.driver_cfg_size = sizeof(wifi_cfg);
+    }
+    
     controller_init(&ctrl_cfg);
+
     const float dt = 0.01f; // 10ms loop
     while (1) {
         float time_start = esp_timer_get_time();

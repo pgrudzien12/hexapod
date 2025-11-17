@@ -8,7 +8,9 @@
 #include "esp_log.h"
 #include "controller_internal.h"
 #include "controller_flysky_ibus.h"
+#include "rpc_transport.h"
 #include <math.h>
+#include <stdio.h>
 
 #define IBUS_BUF_SIZE 64
 static const char *TAG = "ctrl_flysky_ibus";
@@ -68,7 +70,14 @@ static void flysky_task(void *arg)
                     local[i] = (int16_t)sv;
                 }
                 for (int i = 14; i < CONTROLLER_MAX_CHANNELS; ++i) local[i] = 0;
-                controller_internal_update_channels(local);
+                
+                char rpc_cmd[512];
+                int offset = snprintf(rpc_cmd, sizeof(rpc_cmd), "set controller");
+                for (int i = 0; i < CONTROLLER_MAX_CHANNELS; ++i) {
+                    offset += snprintf(rpc_cmd + offset, sizeof(rpc_cmd) - offset, " %d", local[i]);
+                }
+                rpc_transport_rx_send(RPC_TRANSPORT_INTERNAL, (uint8_t*)rpc_cmd, strlen(rpc_cmd));
+
                 last_frame_tick = now_tick;
                 if (!controller_internal_is_connected()) {
                     controller_internal_set_connected(true);

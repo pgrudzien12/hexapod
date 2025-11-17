@@ -18,6 +18,7 @@
 #include "esp_system.h"
 #include "esp_log.h"
 #include "esp_err.h"
+#include "controller_internal.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -236,12 +237,36 @@ static void cmd_factory_reset(void) {
 	if (config_factory_reset()==ESP_OK) rpc_send("factory-reset: OK"); else rpc_send("factory-reset: ERROR");
 }
 
+static void cmd_set_controller(int argc, char *argv[]) {
+    if (argc < 3) { // at least "set" "controller" are required
+        rpc_send("usage: set controller <ch0>...<ch31>");
+        return;
+    }
+    int16_t channels[CONTROLLER_MAX_CHANNELS];
+    int num_channels_provided = argc - 2;
+
+    for (int i = 0; i < CONTROLLER_MAX_CHANNELS; i++) {
+        if (i < num_channels_provided) {
+            channels[i] = (int16_t)strtol(argv[i + 2], NULL, 10);
+        } else {
+            channels[i] = 0;
+        }
+    }
+    controller_internal_update_channels(channels);
+	// No response needed for high-frequency commands from external sources
+}
+
 static void rpc_execute_line(char *line) {
 	trim(line);
 	if (line[0]=='\0') return;
-	char *argv[8]; int argc = tokenize(line, argv, 8);
+	char *argv[34]; // Increased for set controller
+    int argc = tokenize(line, argv, 34);
 	if (argc == 0) return;
-	if (strcmp(argv[0], "help")==0) { cmd_help(); }
+
+    if (strcmp(argv[0], "set") == 0 && argc > 1 && strcmp(argv[1], "controller") == 0) {
+        cmd_set_controller(argc, argv);
+    }
+	else if (strcmp(argv[0], "help")==0) { cmd_help(); }
 	else if (strcmp(argv[0], "version")==0) { cmd_version(); }
 	else if (strcmp(argv[0], "list")==0) { cmd_list(argc, argv); }
 	else if (strcmp(argv[0], "get")==0) { cmd_get(argc, argv); }

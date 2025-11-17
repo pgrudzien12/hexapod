@@ -1,4 +1,4 @@
-// Bluetooth Classic SPP controller driver: receives binary channel frames over Bluetooth SPP
+// Bluetooth Classic SPP controller driver: receives RPC commands over Bluetooth SPP
 #include <string.h>
 #include <stdio.h>
 #include <inttypes.h>
@@ -20,15 +20,6 @@
 #include "rpc_transport.h"
 
 static const char *TAG = "ctrl_bt";
-
-// Frame constants (same as WiFi TCP protocol)
-#define BT_CTRL_SYNC0 0xAA
-#define BT_CTRL_SYNC1 0x55
-#define BT_CTRL_PROTO_VERSION 1
-#define BT_CTRL_BASE_HEADER 8
-#define BT_CTRL_NUM_CHANNELS 32
-#define BT_CTRL_CHANNEL_BYTES (BT_CTRL_NUM_CHANNELS * 2)
-#define BT_CTRL_FRAME_SIZE (BT_CTRL_BASE_HEADER + BT_CTRL_CHANNEL_BYTES + 2)
 
 // Global state
 static uint32_t g_spp_handle = 0;
@@ -52,70 +43,6 @@ static void build_device_name(char *out, size_t out_sz, const char *prefix) {
     
     const char *pfx = prefix ? prefix : "HEXAPOD";
     snprintf(out, out_sz, "%s_%02X%02X%02X", pfx, mac[3], mac[4], mac[5]);
-}
-
-// CRC16-CCITT (same as WiFi TCP driver)
-static uint16_t crc16_ccitt(const uint8_t *data, size_t len) {
-    uint16_t crc = 0xFFFF;
-    for (size_t i = 0; i < len; ++i) {
-        crc ^= (uint16_t)data[i] << 8;
-        for (int b = 0; b < 8; ++b) {
-            if (crc & 0x8000) crc = (crc << 1) ^ 0x1021; else crc <<= 1;
-        }
-    }
-    return crc;
-}
-
-static void process_frame_data(const uint8_t *data, size_t len) {
-    if (len < BT_CTRL_FRAME_SIZE) {
-        ESP_LOGW(TAG, "frame too short: %zu bytes", len);
-        return;
-    }
-
-    // Parse header
-    if (data[0] != BT_CTRL_SYNC0 || data[1] != BT_CTRL_SYNC1) {
-        ESP_LOGW(TAG, "bad sync %02X %02X", data[0], data[1]);
-        return;
-    }
-    
-    uint8_t ver = data[2];
-    if (ver != BT_CTRL_PROTO_VERSION) {
-        ESP_LOGW(TAG, "unsupported version %u", (unsigned)ver);
-        return;
-    }
-    
-    uint8_t flags = data[3];
-    uint16_t seq = (uint16_t)(data[4] | (data[5] << 8));
-    uint16_t payload_len = (uint16_t)(data[6] | (data[7] << 8));
-    
-    if (payload_len != BT_CTRL_CHANNEL_BYTES) {
-        ESP_LOGW(TAG, "unexpected payload_len=%u", (unsigned)payload_len);
-        return;
-    }
-
-    // Verify CRC
-    uint16_t rx_crc = (uint16_t)(data[BT_CTRL_BASE_HEADER + BT_CTRL_CHANNEL_BYTES] | 
-                                 (data[BT_CTRL_BASE_HEADER + BT_CTRL_CHANNEL_BYTES + 1] << 8));
-    uint16_t calc_crc = crc16_ccitt(data, BT_CTRL_BASE_HEADER + BT_CTRL_CHANNEL_BYTES);
-    
-    if (rx_crc != calc_crc) {
-        ESP_LOGW(TAG, "CRC mismatch rx=%04X calc=%04X", rx_crc, calc_crc);
-        return;
-    }
-
-    // Extract channels
-    int16_t channels[BT_CTRL_NUM_CHANNELS];
-    const uint8_t *payload = data + BT_CTRL_BASE_HEADER;
-    for (int i = 0; i < BT_CTRL_NUM_CHANNELS; ++i) {
-        channels[i] = (int16_t)(payload[2*i] | (payload[2*i+1] << 8));
-    }
-    
-    controller_internal_update_channels(channels);
-    g_last_frame = xTaskGetTickCount();
-    
-    // Suppress unused variable warnings
-    (void)flags;
-    (void)seq;
 }
 
 static void esp_spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t *param) {
@@ -163,13 +90,9 @@ static void esp_spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t *param) {
         if (param->data_ind.handle == g_spp_handle) {
             const uint8_t *d = param->data_ind.data;
             size_t l = param->data_ind.len;
-            // Detect binary control frame vs ASCII RPC text
-            if (l >= 2 && d[0] == BT_CTRL_SYNC0 && d[1] == BT_CTRL_SYNC1) {
-                process_frame_data(d, l);
-            } else {
-                // Send RPC data to transport queue
-                rpc_transport_rx_send(RPC_TRANSPORT_BLUETOOTH, d, l);
-            }
+            // Send all data to RPC transport queue
+            rpc_transport_rx_send(RPC_TRANSPORT_BLUETOOTH, d, l);
+            g_last_frame = xTaskGetTickCount();
         }
         break;
         

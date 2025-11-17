@@ -56,6 +56,7 @@ static system_config_t g_system_config = {0};
 #define SYS_KEY_ROBOT_ID            "robot_id"
 #define SYS_KEY_ROBOT_NAME          "robot_name"
 #define SYS_KEY_CONFIG_VERSION      "config_ver"
+#define SYS_KEY_CONTROLLER_TYPE     "ctrl_type"
 
 // =============================================================================
 // Global Version Management
@@ -117,6 +118,9 @@ static esp_err_t init_system_defaults_to_nvs(void) {
     // Schema version for this namespace
     ESP_ERROR_CHECK(nvs_set_u16(handle, SYS_KEY_CONFIG_VERSION, CONFIG_SCHEMA_VERSION));
     
+    // Default controller type
+    ESP_ERROR_CHECK(nvs_set_u8(handle, SYS_KEY_CONTROLLER_TYPE, (uint8_t)CONTROLLER_DRIVER_FLYSKY_IBUS));
+
     ESP_ERROR_CHECK(nvs_commit(handle));
     ESP_LOGI(TAG, "System defaults written to NVS");
     
@@ -292,6 +296,16 @@ static esp_err_t load_system_config_from_nvs(void) {
         g_system_config.config_version = CONFIG_SCHEMA_VERSION;  // Assume current
     }
     
+    // Read controller type
+    uint8_t ctrl_type = 0;
+    err = nvs_get_u8(handle, SYS_KEY_CONTROLLER_TYPE, &ctrl_type);
+    if (err == ESP_OK) {
+        g_system_config.controller_type = (controller_driver_type_e)ctrl_type;
+    } else {
+        ESP_LOGW(TAG, "Failed to read controller_type, using default: %s", esp_err_to_name(err));
+        g_system_config.controller_type = CONTROLLER_DRIVER_WIFI_TCP;
+    }
+
     g_manager_state.namespace_loaded[CONFIG_NS_SYSTEM] = true;
     g_manager_state.namespace_dirty[CONFIG_NS_SYSTEM] = false;
     
@@ -326,6 +340,9 @@ static esp_err_t save_system_config_to_nvs(void) {
     // Version
     ESP_ERROR_CHECK(nvs_set_u16(handle, SYS_KEY_CONFIG_VERSION, g_system_config.config_version));
     
+    // Controller type
+    ESP_ERROR_CHECK(nvs_set_u8(handle, SYS_KEY_CONTROLLER_TYPE, (uint8_t)g_system_config.controller_type));
+
     // Commit changes
     err = nvs_commit(handle);
     if (err != ESP_OK) {
@@ -600,6 +617,14 @@ static const config_param_info_t g_system_param_table[] = {
         .size = sizeof(uint16_t),
         .description = "Configuration schema version",
         .constraints = { .uint_range = { 1, 65535 } }
+    },
+    {
+        .name = "controller_type",
+        .type = CONFIG_TYPE_UINT16, // Using UINT16 for enum
+        .offset = offsetof(system_config_t, controller_type),
+        .size = sizeof(controller_driver_type_e),
+        .description = "Default controller driver type",
+        .constraints = { .uint_range = { 0, 4 } } // Corresponds to enum values
     }
 };
 
@@ -1013,6 +1038,9 @@ void config_load_system_defaults(system_config_t* config) {
     // Configuration version
     config->config_version = CONFIG_SCHEMA_VERSION;
     
+    // Default controller
+    config->controller_type = CONTROLLER_DRIVER_FLYSKY_IBUS;
+
     ESP_LOGD(TAG, "Loaded system defaults - robot_id=%s", config->robot_id);
 }
 

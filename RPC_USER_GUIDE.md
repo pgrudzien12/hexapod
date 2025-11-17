@@ -34,7 +34,7 @@ Purpose: This document specifies the Hexapod RPC protocol for a client implement
 
 - Clients should open the platform-provided serial endpoint (virtual COM port on Windows, /dev/tty.* on Unix) or use a native SPP socket where available. The logical transport is an RFCOMM byte stream. Clients must treat the link as an unreliable serial channel.
 
-- Only one SPP client is accepted at a time. The robot also uses a reserved binary frame format beginning with bytes 0xAA 0x55 for internal control; RPC clients must avoid sending frames beginning with that sequence.
+- Only one SPP client is accepted at a time.
 
 2. Line Framing and Encoding
 
@@ -87,8 +87,6 @@ Purpose: This document specifies the Hexapod RPC protocol for a client implement
 - Reconnect strategy: implement exponential backoff on disconnect, and re-synchronize by issuing a help or version command on reconnect.
 
 - Partial responses: on malformed or truncated responses, discard up to the next terminator and optionally retry the command once.
-
-- Avoid sending binary frames that begin with the reserved sync sequence 0xAA 0x55.
 
 8. Concurrency and Rate Control
 

@@ -70,27 +70,11 @@ Timeout threshold: 1000 ms is default; adapt (or make configurable) if your tran
 - Channel format: uint16_t 1000–2000 range → mapped to signed int16_t
 - Update rate: ~50 Hz
 
-### 7.2 WiFi TCP Binary Protocol
-Standard WiFi TCP driver frame (Version 1):
-```
-Offset Size Field
-0      2    Sync 0xAA 0x55
-2      1    Version (0x01)
-3      1    Flags (bit0: channels present; others reserved)
-4      2    Sequence (uint16 LE)
-6      2    Payload length (expected 64 for 32 * int16)
-8      64   Channels (32 * int16 LE, -32768..32767)
-72     2    CRC16-CCITT over bytes 0..71 (poly 0x1021, init 0xFFFF)
-Total: 74 bytes
-```
-Frames with unsupported version or wrong length are discarded. CRC mismatch frames are dropped.
+### 7.2 WiFi TCP
+The WiFi TCP driver previously used a binary protocol. This is now deprecated. The driver should now format an RPC command string and send it to the RPC system.
 
 ### 7.3 Bluetooth Classic SPP Protocol
-Uses identical frame format to WiFi TCP (74 bytes) for consistency. See `BLUETOOTH_CLASSIC_PROTOCOL.md` for complete specification including:
-- SPP transport layer details and pairing strategy for no-input devices
-- Fixed PIN authentication (1234 default)
-- Connection management and auto-reconnect behavior
-- Frame parsing and error handling specifics
+The Bluetooth Classic SPP driver previously used a binary protocol. This is now deprecated. The driver should now format an RPC command string and send it to the RPC system.
 
 ## 5. Driver Task Lifecycle
 

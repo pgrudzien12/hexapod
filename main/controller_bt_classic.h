@@ -18,7 +18,7 @@ typedef struct {
     const char *spp_server_name;     // SPP server name (default: "HEXAPOD_SPP")
     bool enable_ssp;                 // Enable Secure Simple Pairing (default: false for no-input devices)
     uint32_t pin_code;               // Fixed PIN code for legacy pairing (default: 1234)
-    uint16_t connection_timeout_ms;  // Connection timeout (default: 1000ms)
+    uint16_t connection_timeout_ms;  // Connection timeout (default: 60000ms)
 } controller_bt_classic_cfg_t;
 
 // Default configuration initializer
@@ -28,7 +28,7 @@ static inline controller_bt_classic_cfg_t controller_bt_classic_default(void) {
         .spp_server_name = "HEXAPOD_SPP", 
         .enable_ssp = true, 
         .pin_code = 1234,
-        .connection_timeout_ms = 1000
+        .connection_timeout_ms = 60000
     };
     return cfg;
 }
