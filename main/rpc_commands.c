@@ -32,6 +32,7 @@ static rpc_send_fn_t g_send_cb = NULL;
 static rpc_transport_type_t g_active_transport = RPC_TRANSPORT_BLUETOOTH;
 
 static void rpc_send(const char *fmt, ...) {
+	ESP_LOGI(TAG, "rpc_send called");
 	char stack_buf[256];
 	va_list ap; va_start(ap, fmt);
 	int needed = vsnprintf(stack_buf, sizeof(stack_buf), fmt, ap);
@@ -84,6 +85,7 @@ static void rpc_processing_task(void* param) {
         esp_err_t err = rpc_transport_rx_receive(&msg, 1000); // 1 second timeout
         
         if (err == ESP_OK) {
+    		ESP_LOGI(TAG, "rpc_transport_rx_receive ESP_OK");
             // Set active transport for responses
             g_active_transport = msg.transport;
             // Process the received data
@@ -255,13 +257,7 @@ void rpc_feed_bytes(const uint8_t *data, size_t len) {
 	if (!data || len==0) return;
 	for (size_t i=0;i<len;i++) {
 		char c = (char)data[i];
-		if (c=='\n' || c=='\r') {
-			if (line_len > 0) {
-				line_buf[line_len] = '\0';
-				rpc_execute_line(line_buf);
-				line_len = 0;
-			}
-		} else if (isprint((unsigned char)c) || isspace((unsigned char)c)) {
+		if (isprint((unsigned char)c) || isspace((unsigned char)c)) {
 			if (line_len < sizeof(line_buf)-1) {
 				line_buf[line_len++] = c;
 			} else {
@@ -271,6 +267,11 @@ void rpc_feed_bytes(const uint8_t *data, size_t len) {
 			}
 		}
 	}
+	
+	ESP_LOGI(TAG, "rpc_send rpc_execute_line");
+	line_buf[line_len] = '\0';
+	rpc_execute_line(line_buf);
+	line_len = 0;
 }
 
 void rpc_poll(void) {

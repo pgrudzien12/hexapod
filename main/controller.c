@@ -97,7 +97,6 @@ const void *controller_internal_get_driver_cfg(size_t *out_size)
 
 // Forward declaration of implemented driver init functions
 void controller_driver_init_flysky_ibus(const controller_config_t *cfg);
-void controller_driver_init_wifi_tcp(const controller_config_t *cfg);
 void controller_driver_init_bt_classic(const controller_config_t *cfg);
 
 void controller_init(const controller_config_t *cfg)
@@ -115,7 +114,6 @@ void controller_init(const controller_config_t *cfg)
     controller_fill_failsafe(g_channels);
     switch (g_cfg.driver_type) {
         case CONTROLLER_DRIVER_WIFI_TCP:
-            controller_driver_init_wifi_tcp(&g_cfg);
             break;
         case CONTROLLER_DRIVER_BT_CLASSIC:
             controller_driver_init_bt_classic(&g_cfg);

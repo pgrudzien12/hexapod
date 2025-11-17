@@ -51,19 +51,16 @@ void gait_framework_main(void *arg)
     robot_config_init_default();
     // user_command_init();
     
-    // Initialize Bluetooth Classic controller driver
-    // controller_bt_classic_cfg_t bt_cfg = controller_bt_classic_default();
-    // Initialize WiFi TCP controller driver
-    controller_wifi_tcp_cfg_t wifi_cfg = controller_wifi_tcp_default();
+    // Initialize WiFi TCP RPC server
+    wifi_tcp_rpc_init(4096, 10);
     controller_config_t ctrl_cfg = {
         .driver_type = CONTROLLER_DRIVER_WIFI_TCP,
         .task_stack = 4096,
         .task_prio = 10,
-        .driver_cfg = &wifi_cfg,
-        .driver_cfg_size = sizeof(wifi_cfg)
+        .driver_cfg = 0,
+        .driver_cfg_size = 0
     };
     controller_init(&ctrl_cfg);
-
     const float dt = 0.01f; // 10ms loop
     while (1) {
         float time_start = esp_timer_get_time();
