@@ -86,7 +86,6 @@ static void rpc_processing_task(void* param) {
         esp_err_t err = rpc_transport_rx_receive(&msg, 1000); // 1 second timeout
         
         if (err == ESP_OK) {
-    		ESP_LOGI(TAG, "rpc_transport_rx_receive ESP_OK");
             // Set active transport for responses
             g_active_transport = msg.transport;
             // Process the received data
@@ -293,7 +292,6 @@ void rpc_feed_bytes(const uint8_t *data, size_t len) {
 		}
 	}
 	
-	ESP_LOGI(TAG, "rpc_send rpc_execute_line");
 	line_buf[line_len] = '\0';
 	rpc_execute_line(line_buf);
 	line_len = 0;
