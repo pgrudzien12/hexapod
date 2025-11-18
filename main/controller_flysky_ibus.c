@@ -46,16 +46,16 @@ static void flysky_task(void *arg)
     uint8_t data[IBUS_BUF_SIZE];
     TickType_t last_frame_tick = xTaskGetTickCount();
     controller_internal_set_connected(false);
-
+    int channels = min(CONTROLLER_MAX_CHANNELS, 14); // iBUS provides up to 14 channels
     while (1) {
         const TickType_t timeout_ticks = pdMS_TO_TICKS(20);
-    int len = uart_read_bytes(cfg_drv->uart_port, data, sizeof(data), timeout_ticks);
+        int len = uart_read_bytes(cfg_drv->uart_port, data, sizeof(data), timeout_ticks);
         TickType_t now_tick = xTaskGetTickCount();
         if (len >= 32) {
             if (data[0] == 0x20 && data[1] == 0x40) {
                 int16_t local[CONTROLLER_MAX_CHANNELS];
                 // First 14 channels from iBUS (or as many as frame provides)
-                for (int i = 0; i < 14 && i < CONTROLLER_MAX_CHANNELS; ++i) {
+                for (int i = 0; i < channels; ++i) {
                     uint16_t raw = (uint16_t)(data[2 + i*2] | (data[3 + i*2] << 8)); // 1000..2000 typical
                     if (raw < 1000) raw = 1000;
                     if (raw > 2000) raw = 2000;
@@ -69,11 +69,10 @@ static void flysky_task(void *arg)
                     if (sv > 32767) sv = 32767;
                     local[i] = (int16_t)sv;
                 }
-                for (int i = 14; i < CONTROLLER_MAX_CHANNELS; ++i) local[i] = 0;
                 
                 char rpc_cmd[512];
                 int offset = snprintf(rpc_cmd, sizeof(rpc_cmd), "set controller");
-                for (int i = 0; i < CONTROLLER_MAX_CHANNELS; ++i) {
+                for (int i = 0; i < channels; ++i) {
                     offset += snprintf(rpc_cmd + offset, sizeof(rpc_cmd) - offset, " %d", local[i]);
                 }
                 rpc_transport_rx_send(RPC_TRANSPORT_INTERNAL, (uint8_t*)rpc_cmd, strlen(rpc_cmd));
