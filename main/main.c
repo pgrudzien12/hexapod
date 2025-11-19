@@ -45,28 +45,9 @@ void gait_framework_main(void *arg)
     ESP_ERROR_CHECK(kpp_init(&kpp_state, &motion_limits));
     ESP_LOGI(TAG, "KPP system initialized with motion limiting enabled");
 
-    // Initialize modules with example parameters
+    // Initialize gait framework modules
     gait_scheduler_init(&scheduler, 1.5f); // 1.5 second cycle time
     swing_trajectory_init(&trajectory, 0.07f, 0.04f); // 7cm step, 4cm clearance
-    robot_config_init_default();
-    
-    // Initialize the controller based on system configuration
-    const system_config_t* sys_cfg = config_get_system();
-    controller_config_t ctrl_cfg = {
-        .driver_type = sys_cfg->controller_type,
-        .task_stack = 4096,
-        .task_prio = 10,
-    };
-
-    // Assign driver-specific configuration if needed
-    controller_wifi_tcp_cfg_t wifi_cfg;
-    if (sys_cfg->controller_type == CONTROLLER_DRIVER_WIFI_TCP) {
-        wifi_cfg = controller_wifi_tcp_default();
-        ctrl_cfg.driver_cfg = &wifi_cfg;
-        ctrl_cfg.driver_cfg_size = sizeof(wifi_cfg);
-    }
-    
-    controller_init(&ctrl_cfg);
 
     const float dt = 0.01f; // 10ms loop
     while (1) {
@@ -140,5 +121,41 @@ void app_main(void)
     // Bring up WiFi AP early so that network-based controller drivers or diagnostics
     // can connect even if later initialization stalls. Uses default options (MAC suffix).
     wifi_ap_init_once();
+    
+    // Initialize robot configuration
+    robot_config_init_default();
+    
+    // Initialize the primary controller from system configuration
+    controller_config_t ctrl_cfg = {
+        .driver_type = sys_config->controller_type,
+        .task_stack = 4096,
+        .task_prio = 10,
+    };
+
+    // Assign driver-specific configuration if needed
+    controller_wifi_tcp_cfg_t wifi_cfg;
+    if (ctrl_cfg.driver_type == CONTROLLER_DRIVER_WIFI_TCP) {
+        wifi_cfg = controller_wifi_tcp_default();
+        ctrl_cfg.driver_cfg = &wifi_cfg;
+        ctrl_cfg.driver_cfg_size = sizeof(wifi_cfg);
+    }
+    
+    controller_init(&ctrl_cfg);
+
+    // ALWAYS initialize WiFi TCP controller for RPC commands (separate from primary controller)
+    // This provides network-based diagnostics and control regardless of primary controller type
+    if (ctrl_cfg.driver_type != CONTROLLER_DRIVER_WIFI_TCP) {
+        ESP_LOGI(TAG, "Initializing WiFi TCP controller as secondary RPC interface");
+        controller_wifi_tcp_cfg_t wifi_rpc_cfg = controller_wifi_tcp_default();
+        controller_config_t wifi_ctrl_cfg = {
+            .driver_type = CONTROLLER_DRIVER_WIFI_TCP,
+            .task_stack = 4096,
+            .task_prio = 8,  // Lower priority than primary controller
+            .driver_cfg = &wifi_rpc_cfg,
+            .driver_cfg_size = sizeof(wifi_rpc_cfg),
+        };
+        controller_driver_init_wifi_tcp(&wifi_ctrl_cfg);
+    }
+    
     gait_framework_main(NULL);
 }

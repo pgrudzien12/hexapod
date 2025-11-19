@@ -15,6 +15,10 @@
 #define IBUS_BUF_SIZE 64
 static const char *TAG = "ctrl_flysky_ibus";
 
+#ifndef min
+#define min(a,b) ((a) < (b) ? (a) : (b))
+#endif
+
 static void flysky_task(void *arg)
 {
     (void)controller_internal_get_config(); // currently unused core params

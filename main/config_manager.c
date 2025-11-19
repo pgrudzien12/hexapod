@@ -303,7 +303,7 @@ static esp_err_t load_system_config_from_nvs(void) {
         g_system_config.controller_type = (controller_driver_type_e)ctrl_type;
     } else {
         ESP_LOGW(TAG, "Failed to read controller_type, using default: %s", esp_err_to_name(err));
-        g_system_config.controller_type = CONTROLLER_DRIVER_WIFI_TCP;
+        g_system_config.controller_type = CONTROLLER_DRIVER_FLYSKY_IBUS;
     }
 
     g_manager_state.namespace_loaded[CONFIG_NS_SYSTEM] = true;
