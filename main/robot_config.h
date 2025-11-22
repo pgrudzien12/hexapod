@@ -2,6 +2,7 @@
 #define ROBOT_CONFIG_H
 
 #include "leg.h"
+#include "types/joint_types.h"
 
 #define NUM_LEGS 6
 
@@ -19,23 +20,10 @@ typedef enum {
 // Central robot configuration holder.
 // NOTE: Keep this minimal and focused on data; we're planning to move settings to ESP storage later.
 // TODO(ESP-Storage): Persist all fields in NVS (or preferred storage) and load at boot.
-// Per-joint actuator calibration
-typedef struct {
-    float zero_offset_rad;  // mechanical zero offset added before inversion/clamp
-    int8_t invert_sign;     // +1 or -1 to flip direction
-    float min_rad;          // lower mechanical/electronic limit (radians)
-    float max_rad;          // upper mechanical/electronic limit (radians)
-    int pwm_min_us;         // PWM at min_rad (microseconds)
-    int pwm_max_us;         // PWM at max_rad (microseconds)
-    int neutral_us;         // PWM at neutral (optional; informative)
-} joint_calib_t;
 
 typedef struct {
     // IK geometry per leg (opaque handles with only lengths inside)
     leg_handle_t legs[NUM_LEGS];
-
-    // Per-joint calibration per leg (coxa, femur, tibia)
-    joint_calib_t joint_calib[NUM_LEGS][3];
 
     // Servo GPIO mapping per leg/joint (−1 means unassigned)
     int servo_gpio[NUM_LEGS][3];

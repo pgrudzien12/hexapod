@@ -16,6 +16,7 @@
 #include "esp_err.h"
 #include "nvs_flash.h"
 #include "controller.h"
+#include "types/joint_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -27,11 +28,30 @@ extern "C" {
 
 typedef enum {
     CONFIG_NS_SYSTEM = 0,        // System-wide settings and safety
+    CONFIG_NS_JOINT_CALIB = 1,   // Joint calibration per leg/joint
     CONFIG_NS_COUNT              // Keep this last
 } config_namespace_t;
 
 // Namespace string mappings (must match enum order)
 extern const char* CONFIG_NAMESPACE_NAMES[CONFIG_NS_COUNT];
+
+// =============================================================================
+// Joint Calibration Configuration Structure
+// =============================================================================
+
+// Number of legs and joints per leg
+#define NUM_LEGS 6
+#define NUM_JOINTS_PER_LEG 3
+
+
+
+// Complete joint calibration configuration for all legs and joints
+typedef struct {
+    // Joint calibration data indexed by [leg][joint]
+    // leg: 0-5 (LEG_LEFT_FRONT to LEG_RIGHT_REAR)
+    // joint: 0-2 (LEG_SERVO_COXA, LEG_SERVO_FEMUR, LEG_SERVO_TIBIA)
+    joint_calib_t joints[NUM_LEGS][NUM_JOINTS_PER_LEG];
+} joint_calib_config_t;
 
 // =============================================================================
 // System Configuration Structure
@@ -95,14 +115,6 @@ esp_err_t config_manager_get_state(config_manager_state_t *state);
 bool config_manager_has_dirty_data(void);
 
 /**
- * @brief Force reload namespace from NVS (discards memory changes)
- * 
- * @param ns Namespace to reload
- * @return ESP_OK on success, error code on failure
- */
-esp_err_t config_manager_reload_namespace(config_namespace_t ns);
-
-/**
  * @brief Save specific namespace to NVS
  * 
  * @param ns Namespace to save
@@ -128,6 +140,121 @@ const system_config_t* config_get_system(void);
  * @return ESP_OK on success, error code on NVS write failure
  */
 esp_err_t config_set_system(const system_config_t* config);
+
+// =============================================================================
+// Joint Calibration Configuration API
+// =============================================================================
+
+/**
+ * @brief Get joint calibration configuration (from memory cache)
+ * 
+ * @return Pointer to joint calibration configuration structure (read-only)
+ */
+const joint_calib_config_t* config_get_joint_calib(void);
+
+/**
+ * @brief Set complete joint calibration configuration structure (always persistent)
+ * 
+ * @param config Pointer to joint calibration configuration structure
+ * @return ESP_OK on success, error code on NVS write failure
+ */
+esp_err_t config_set_joint_calib(const joint_calib_config_t* config);
+
+/**
+ * @brief Get calibration data for a specific joint (memory-only)
+ * 
+ * @param leg_index Leg index (0-5)
+ * @param joint Joint type (0-2: coxa, femur, tibia)
+ * @param[out] calib_data Pointer to store calibration data
+ * @return ESP_OK on success, ESP_ERR_INVALID_ARG on invalid indices
+ */
+esp_err_t config_get_joint_calib_data(int leg_index, int joint, joint_calib_t* calib_data);
+
+/**
+ * @brief Set calibration data for a specific joint (memory-only)
+ * 
+ * @param leg_index Leg index (0-5)
+ * @param joint Joint type (0-2: coxa, femur, tibia)
+ * @param calib_data Pointer to calibration data
+ * @return ESP_OK on success, ESP_ERR_INVALID_ARG on invalid indices
+ */
+esp_err_t config_set_joint_calib_data_memory(int leg_index, int joint, const joint_calib_t* calib_data);
+
+/**
+ * @brief Set calibration data for a specific joint (persistent)
+ * 
+ * @param leg_index Leg index (0-2: coxa, femur, tibia)
+ * @param joint Joint type (0-2: coxa, femur, tibia)
+ * @param calib_data Pointer to calibration data
+ * @return ESP_OK on success, ESP_ERR_INVALID_ARG on invalid indices
+ */
+esp_err_t config_set_joint_calib_data_persist(int leg_index, int joint, const joint_calib_t* calib_data);
+
+/**
+ * @brief Set joint offset (memory-only)
+ * 
+ * @param leg_index Leg index (0-5)
+ * @param joint Joint type (0-2: coxa, femur, tibia)
+ * @param offset_rad Offset in radians
+ * @return ESP_OK on success, ESP_ERR_INVALID_ARG on invalid indices
+ */
+esp_err_t config_set_joint_offset_memory(int leg_index, int joint, float offset_rad);
+
+/**
+ * @brief Set joint offset (persistent)
+ * 
+ * @param leg_index Leg index (0-5)
+ * @param joint Joint type (0-2: coxa, femur, tibia)
+ * @param offset_rad Offset in radians
+ * @return ESP_OK on success, ESP_ERR_INVALID_ARG on invalid indices
+ */
+esp_err_t config_set_joint_offset_persist(int leg_index, int joint, float offset_rad);
+
+/**
+ * @brief Set joint angle limits (memory-only)
+ * 
+ * @param leg_index Leg index (0-5)
+ * @param joint Joint type (0-2: coxa, femur, tibia)
+ * @param min_rad Minimum angle in radians
+ * @param max_rad Maximum angle in radians
+ * @return ESP_OK on success, ESP_ERR_INVALID_ARG on invalid indices
+ */
+esp_err_t config_set_joint_limits_memory(int leg_index, int joint, float min_rad, float max_rad);
+
+/**
+ * @brief Set joint angle limits (persistent)
+ * 
+ * @param leg_index Leg index (0-5)
+ * @param joint Joint type (0-2: coxa, femur, tibia)
+ * @param min_rad Minimum angle in radians
+ * @param max_rad Maximum angle in radians
+ * @return ESP_OK on success, ESP_ERR_INVALID_ARG on invalid indices
+ */
+esp_err_t config_set_joint_limits_persist(int leg_index, int joint, float min_rad, float max_rad);
+
+/**
+ * @brief Set joint PWM values (memory-only)
+ * 
+ * @param leg_index Leg index (0-5)
+ * @param joint Joint type (0-2: coxa, femur, tibia)
+ * @param pwm_min_us PWM value at minimum angle (microseconds)
+ * @param pwm_max_us PWM value at maximum angle (microseconds)
+ * @param pwm_neutral_us PWM value at neutral position (microseconds)
+ * @return ESP_OK on success, ESP_ERR_INVALID_ARG on invalid indices
+ */
+esp_err_t config_set_joint_pwm_memory(int leg_index, int joint, int32_t pwm_min_us, int32_t pwm_max_us, int32_t pwm_neutral_us);
+
+/**
+ * @brief Set joint PWM values (persistent)
+ * 
+ * @param leg_index Leg index (0-5)
+ * @param joint Joint type (0-2: coxa, femur, tibia)
+ * @param pwm_min_us PWM value at minimum angle (microseconds)
+ * @param pwm_max_us PWM value at maximum angle (microseconds)
+ * @param pwm_neutral_us PWM value at neutral position (microseconds)
+ * @return ESP_OK on success, ESP_ERR_INVALID_ARG on invalid indices
+ */
+esp_err_t config_set_joint_pwm_persist(int leg_index, int joint, int32_t pwm_min_us, int32_t pwm_max_us, int32_t pwm_neutral_us);
 
 // =============================================================================
 // Parameter Types and Metadata
@@ -346,6 +473,13 @@ esp_err_t config_set_parameter(const char* namespace_str, const char* key,
  * @param config Pointer to system config structure to fill with defaults
  */
 void config_load_system_defaults(system_config_t* config);
+
+/**
+ * @brief Load factory default joint calibration configuration
+ * 
+ * @param config Pointer to joint calibration config structure to fill with defaults
+ */
+void config_load_joint_calib_defaults(joint_calib_config_t* config);
 
 /**
  * @brief Factory reset - restore all configuration to defaults

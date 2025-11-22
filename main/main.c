@@ -26,7 +26,7 @@
 #include "config_manager.h"
 #include "rpc_commands.h"
 
-static const char *TAG = "leg";
+static const char *TAG = "main";
 
 // --- Gait Framework Main Loop ---
 void gait_framework_main(void *arg)
@@ -108,6 +108,9 @@ void app_main(void)
     ESP_LOGI(TAG, "Safety settings: emergency_stop=%s, voltage_min=%.2fV", 
              sys_config->emergency_stop_enabled ? "enabled" : "disabled",
              sys_config->safety_voltage_min);
+    
+    // Joint calibration system is now active and will be used by robot_control
+    ESP_LOGI(TAG, "Joint calibration configuration loaded and ready for robot control");
     
     // Apply startup delay from configuration
     if (sys_config->startup_delay_ms > 0) {

@@ -1,6 +1,8 @@
 #include "robot_config.h"
+#include "config_manager.h"
 #include <string.h>
 #include <math.h>
+#include "esp_log.h"
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
@@ -77,27 +79,9 @@ void robot_config_init_default(void) {
         // TODO: Consider per-leg geometry differences (mirrors, tolerances) via stored config
     }
 
-    // --- Joint calibration defaults ---
-    // Range: [-90°, +90°], no inversion, zero offset = 0, endpoints 500..2500us, neutral ~1500us
-    for (int i = 0; i < NUM_LEGS; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            joint_calib_t *c = &g_cfg.joint_calib[i][j];
-            c->zero_offset_rad = 0.0f;
-            if (j == LEG_SERVO_COXA || j == LEG_SERVO_TIBIA) {
-                c->invert_sign = -1; // coxa often needs inversion
-            } else {
-                c->invert_sign = 1;
-            }
-            // if (i>= LEG_RIGHT_FRONT && j == LEG_SERVO_COXA) {
-            //     c->invert_sign *= -1; // right-side coxa often needs inversion
-            // }
-            c->min_rad = (float)-M_PI * 0.5f;
-            c->max_rad = (float) M_PI * 0.5f;
-            c->pwm_min_us = 500;
-            c->pwm_max_us = 2500;
-            c->neutral_us = 1500;
-        }
-    }
+    // --- Joint calibration ---
+    // Joint calibration is now handled directly by config_manager.
+    // No caching needed - robot_config_get_joint_calib() calls config_manager on-demand.
 
     // --- Mount poses (defaults) ---
     // Indexing convention (example): 0..2 left front->rear, 3..5 right front->rear.
@@ -189,7 +173,26 @@ const joint_calib_t* robot_config_get_joint_calib(int leg_index, leg_servo_t joi
     if (leg_index < 0 || leg_index >= NUM_LEGS) return NULL;
     int j = (int)joint;
     if (j < 0 || j >= 3) return NULL;
-    return &g_cfg.joint_calib[leg_index][j];
+    
+    // Static storage for calibration data
+    static joint_calib_t temp_calib;
+    
+    // Get data directly from configuration manager
+    if (config_get_joint_calib_data(leg_index, j, &temp_calib) == ESP_OK) {
+        // No conversion needed - structures are now identical
+        return &temp_calib;
+    }
+    ESP_LOGW("robot_config", "robot_config_get_joint_calib: Using fallback defaults for leg %d joint %d", leg_index, j);
+    
+    // Fallback to default values if config manager is not available
+    temp_calib.zero_offset_rad = 0.0f;
+    temp_calib.invert_sign = (j == LEG_SERVO_COXA || j == LEG_SERVO_TIBIA) ? -1 : 1;
+    temp_calib.min_rad = (float)-M_PI * 0.5f;
+    temp_calib.max_rad = (float) M_PI * 0.5f;
+    temp_calib.pwm_min_us = 500;
+    temp_calib.pwm_max_us = 2500;
+    temp_calib.neutral_us = 1500;
+    return &temp_calib;
 }
 
 int robot_config_get_servo_gpio(int leg_index, leg_servo_t joint) {
@@ -228,3 +231,5 @@ float robot_config_get_stance_fwd_m(int leg_index) {
     if (leg_index < 0 || leg_index >= NUM_LEGS) return 0.0f;
     return g_stance_fwd[leg_index];
 }
+
+

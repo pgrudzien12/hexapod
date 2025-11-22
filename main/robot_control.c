@@ -94,7 +94,7 @@ static esp_err_t ensure_ledc_timer_inited(void) {
     esp_err_t err = ledc_timer_config(&tcfg);
     if (err == ESP_OK) {
         s_ledc_timer_inited = true;
-        ESP_LOGI(TAG_RC, "Initialized shared LEDC timer for servo legs 2&3 (freq=%dHz, res=%d bits)", SERVO_LEDC_FREQUENCY_HZ, SERVO_LEDC_RES_BITS);
+        ESP_LOGI(TAG_RC, "Initialized shared LEDC timer (freq=%dHz, res=%d bits)", SERVO_LEDC_FREQUENCY_HZ, SERVO_LEDC_RES_BITS);
     } else {
         ESP_LOGE(TAG_RC, "Failed to init LEDC timer (%s)", esp_err_to_name(err));
     }

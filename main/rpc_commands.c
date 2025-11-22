@@ -136,21 +136,39 @@ static void cmd_version(void) {
 	rpc_send("version: firmware %s", esp_get_idf_version());
 }
 
+// Helper function to safely concatenate string list into buffer
+static void safe_string_list_concat(char* buf, size_t buf_size, const char** items, size_t count) {
+	buf[0] = '\0';
+	size_t pos = 0;
+	
+	for (size_t i = 0; i < count; i++) {
+		int written = snprintf(buf + pos, buf_size - pos, "%s%s", 
+		                       items[i], 
+		                       (i + 1 < count) ? ", " : "");
+		
+		if (written < 0 || (size_t)written >= buf_size - pos) {
+			// Would overflow or error, stop here
+			break;
+		}
+		pos += written;
+	}
+}
+
 static void cmd_list(int argc, char *argv[]) {
 	if (argc >= 2 && strcmp(argv[1], "namespaces") == 0) {
 		const char* names[CONFIG_NS_COUNT]; size_t count=0;
 		if (config_list_namespaces(names, &count)==ESP_OK) {
-			char buf[128]; buf[0]='\0';
-			for (size_t i=0;i<count;i++){strcat(buf,names[i]); if(i+1<count) strcat(buf,", ");}
+			char buf[128];
+			safe_string_list_concat(buf, sizeof(buf), names, count);
 			rpc_send("namespaces: %s", buf);
 		} else rpc_send("ERROR list namespaces");
 		return;
 	}
 	if (argc >= 2) {
-		const char* params[32]; size_t count=0;
-		if (config_list_parameters(argv[1], params, 32, &count)==ESP_OK) {
-			char buf[200]; buf[0]='\0';
-			for (size_t i=0;i<count;i++){strcat(buf,params[i]); if(i+1<count) strcat(buf,", ");}
+		const char* params[10]; size_t count=0; // Reduced from 32 to 10 to fit in response
+		if (config_list_parameters(argv[1], params, 10, &count)==ESP_OK) {
+			char buf[256];
+			safe_string_list_concat(buf, sizeof(buf), params, count);
 			rpc_send("list %s: %s", argv[1], buf);
 		} else rpc_send("ERROR list %s", argv[1]);
 	} else {
@@ -224,11 +242,15 @@ static void cmd_export(int argc, char *argv[]) {
 static void cmd_save(int argc, char *argv[]) {
 	if (argc == 1) {
 		// Save all namespaces (currently only system)
-		if (config_manager_save_namespace(CONFIG_NS_SYSTEM)==ESP_OK) rpc_send("save: OK"); else rpc_send("save: ERROR");
+		if (config_manager_save_namespace(CONFIG_NS_SYSTEM)==ESP_OK) rpc_send("save: SYSTEM OK");
+		if (config_manager_save_namespace(CONFIG_NS_JOINT_CALIB)==ESP_OK) rpc_send("save: JOINT_CAL OK");
+		else rpc_send("save: ERROR");
 		return;
 	}
-	if (strcmp(argv[1], "system")==0) {
-		if (config_manager_save_namespace(CONFIG_NS_SYSTEM)==ESP_OK) rpc_send("save system: OK"); else rpc_send("save system: ERROR");
+	if (strcmp(argv[1], CONFIG_NAMESPACE_NAMES[CONFIG_NS_SYSTEM])==0) {
+		if (config_manager_save_namespace(CONFIG_NS_SYSTEM)==ESP_OK) rpc_send("save SYSTEM: OK"); else rpc_send("save SYSTEM: ERROR");
+	} else if (strcmp(argv[1], CONFIG_NAMESPACE_NAMES[CONFIG_NS_JOINT_CALIB])==0) {
+		if (config_manager_save_namespace(CONFIG_NS_JOINT_CALIB)==ESP_OK) rpc_send("save JOINT_CAL: OK"); else rpc_send("save JOINT_CAL: ERROR");
 	} else rpc_send("save: unsupported namespace");
 }
 

@@ -132,8 +132,8 @@ void kpp_apply_limits(const kinematic_state_t* state, const motion_limits_t* lim
 
 #if KPP_ENABLE_LIMIT_LOGGING
     static int limit_log_counter = 0;
-    static float total_limiting_error = 0.0f;
-    static int significant_limits = 0;
+    // static float total_limiting_error = 0.0f;
+    // static int significant_limits = 0;
     
     if (++limit_log_counter >= KPP_LOG_INTERVAL) {
         // Calculate total limiting effect across all joints

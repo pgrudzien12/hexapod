@@ -532,8 +532,6 @@ if (config_manager_has_dirty_data()) {
 // Or save immediately (live tuning + persistence)  
 config_set_safety_voltage_min_persist(7.0f);
 
-// Revert unsaved changes
-config_manager_reload_namespace(CONFIG_NS_SYSTEM);
 ```
 
 ## Implementation Plan (Updated)
