@@ -275,7 +275,6 @@ typedef struct {
     config_param_type_t type;          // Data type
     size_t offset;                     // Offset in config struct
     size_t size;                       // Size in bytes
-    const char* description;           // Human-readable description
     union {
         struct { int32_t min, max; } int_range;
         struct { uint32_t min, max; } uint_range;

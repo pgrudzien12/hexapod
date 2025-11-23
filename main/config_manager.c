@@ -961,7 +961,7 @@ static const config_param_info_t g_system_param_table[] = {
         .type = CONFIG_TYPE_BOOL,
         .offset = offsetof(system_config_t, emergency_stop_enabled),
         .size = sizeof(bool),
-        .description = "Emergency stop functionality enabled",
+        // .description = "Emergency stop functionality enabled",
         .constraints = { .int_range = { 0, 1 } }
     },
     {
@@ -969,7 +969,7 @@ static const config_param_info_t g_system_param_table[] = {
         .type = CONFIG_TYPE_UINT32,
         .offset = offsetof(system_config_t, auto_disarm_timeout),
         .size = sizeof(uint32_t),
-        .description = "Auto-disarm timeout in seconds",
+        // .description = "Auto-disarm timeout in seconds",
         .constraints = { .uint_range = { 5, 300 } }
     },
     {
@@ -977,7 +977,7 @@ static const config_param_info_t g_system_param_table[] = {
         .type = CONFIG_TYPE_FLOAT,
         .offset = offsetof(system_config_t, safety_voltage_min),
         .size = sizeof(float),
-        .description = "Minimum battery voltage in volts",
+        // .description = "Minimum battery voltage in volts",
         .constraints = { .float_range = { 3.0f, 12.0f } }
     },
     {
@@ -985,7 +985,7 @@ static const config_param_info_t g_system_param_table[] = {
         .type = CONFIG_TYPE_FLOAT,
         .offset = offsetof(system_config_t, temperature_limit_max),
         .size = sizeof(float),
-        .description = "Maximum operating temperature in Celsius",
+        // .description = "Maximum operating temperature in Celsius",
         .constraints = { .float_range = { 40.0f, 100.0f } }
     },
     {
@@ -993,7 +993,7 @@ static const config_param_info_t g_system_param_table[] = {
         .type = CONFIG_TYPE_UINT32,
         .offset = offsetof(system_config_t, motion_timeout_ms),
         .size = sizeof(uint32_t),
-        .description = "Motion command timeout in milliseconds",
+        // .description = "Motion command timeout in milliseconds",
         .constraints = { .uint_range = { 100, 5000 } }
     },
     {
@@ -1001,7 +1001,7 @@ static const config_param_info_t g_system_param_table[] = {
         .type = CONFIG_TYPE_UINT32,
         .offset = offsetof(system_config_t, startup_delay_ms),
         .size = sizeof(uint32_t),
-        .description = "Startup safety delay in milliseconds",
+        // .description = "Startup safety delay in milliseconds",
         .constraints = { .uint_range = { 0, 10000 } }
     },
     {
@@ -1009,7 +1009,7 @@ static const config_param_info_t g_system_param_table[] = {
         .type = CONFIG_TYPE_UINT32,
         .offset = offsetof(system_config_t, max_control_frequency),
         .size = sizeof(uint32_t),
-        .description = "Maximum control loop frequency in Hz",
+        // .description = "Maximum control loop frequency in Hz",
         .constraints = { .uint_range = { 50, 1000 } }
     },
     {
@@ -1017,7 +1017,7 @@ static const config_param_info_t g_system_param_table[] = {
         .type = CONFIG_TYPE_STRING,
         .offset = offsetof(system_config_t, robot_id),
         .size = sizeof(((system_config_t*)0)->robot_id),
-        .description = "Unique robot identifier",
+        // .description = "Unique robot identifier",
         .constraints = { .string = { 32 } }
     },
     {
@@ -1025,7 +1025,7 @@ static const config_param_info_t g_system_param_table[] = {
         .type = CONFIG_TYPE_STRING,
         .offset = offsetof(system_config_t, robot_name),
         .size = sizeof(((system_config_t*)0)->robot_name),
-        .description = "Human-readable robot name",
+        // .description = "Human-readable robot name",
         .constraints = { .string = { 64 } }
     },
     {
@@ -1033,7 +1033,7 @@ static const config_param_info_t g_system_param_table[] = {
         .type = CONFIG_TYPE_UINT16,
         .offset = offsetof(system_config_t, config_version),
         .size = sizeof(uint16_t),
-        .description = "Configuration schema version",
+        // .description = "Configuration schema version",
         .constraints = { .uint_range = { 1, 65535 } }
     },
     {
@@ -1041,7 +1041,7 @@ static const config_param_info_t g_system_param_table[] = {
         .type = CONFIG_TYPE_UINT16, // Using UINT16 for enum
         .offset = offsetof(system_config_t, controller_type),
         .size = sizeof(controller_driver_type_e),
-        .description = "Default controller driver type",
+        // .description = "Default controller driver type",
         .constraints = { .uint_range = { 0, 4 } } // Corresponds to enum values
     }
 };
@@ -1092,7 +1092,6 @@ typedef struct {
     config_param_type_t type;
     size_t offset;                    // Offset within joint_calib_t structure
     size_t size;
-    const char* description;
     union {
         struct { int32_t min, max; } int_range;
         struct { uint32_t min, max; } uint_range;
@@ -1108,7 +1107,7 @@ static const joint_param_meta_t g_joint_param_table[] = {
         .type = CONFIG_TYPE_FLOAT,
         .offset = offsetof(joint_calib_t, zero_offset_rad),
         .size = sizeof(float),
-        .description = "Mechanical zero offset in radians",
+        // .description = "Mechanical zero offset in radians",
         .constraints = { .float_range = { -6.28f, 6.28f } } // ±2π radians
     },
     {
@@ -1116,7 +1115,7 @@ static const joint_param_meta_t g_joint_param_table[] = {
         .type = CONFIG_TYPE_INT32,
         .offset = offsetof(joint_calib_t, invert_sign),
         .size = sizeof(int8_t),
-        .description = "Direction inversion: +1 or -1",
+        // .description = "Direction inversion: +1 or -1",
         .constraints = { .int_range = { -1, 1 } }
     },
     {
@@ -1124,7 +1123,7 @@ static const joint_param_meta_t g_joint_param_table[] = {
         .type = CONFIG_TYPE_FLOAT,
         .offset = offsetof(joint_calib_t, min_rad),
         .size = sizeof(float), 
-        .description = "Minimum joint angle in radians",
+        // .description = "Minimum joint angle in radians",
         .constraints = { .float_range = { -6.28f, 6.28f } }
     },
     {
@@ -1132,7 +1131,7 @@ static const joint_param_meta_t g_joint_param_table[] = {
         .type = CONFIG_TYPE_FLOAT,
         .offset = offsetof(joint_calib_t, max_rad),
         .size = sizeof(float),
-        .description = "Maximum joint angle in radians", 
+        // .description = "Maximum joint angle in radians", 
         .constraints = { .float_range = { -6.28f, 6.28f } }
     },
     {
@@ -1140,7 +1139,7 @@ static const joint_param_meta_t g_joint_param_table[] = {
         .type = CONFIG_TYPE_INT32,
         .offset = offsetof(joint_calib_t, pwm_min_us),
         .size = sizeof(int32_t),
-        .description = "PWM pulse width at minimum angle (microseconds)",
+        // .description = "PWM pulse width at minimum angle (microseconds)",
         .constraints = { .int_range = { 500, 3000 } }
     },
     {
@@ -1148,7 +1147,7 @@ static const joint_param_meta_t g_joint_param_table[] = {
         .type = CONFIG_TYPE_INT32,
         .offset = offsetof(joint_calib_t, pwm_max_us),
         .size = sizeof(int32_t),
-        .description = "PWM pulse width at maximum angle (microseconds)",
+        // .description = "PWM pulse width at maximum angle (microseconds)",
         .constraints = { .int_range = { 500, 3000 } }
     },
     {
@@ -1156,7 +1155,7 @@ static const joint_param_meta_t g_joint_param_table[] = {
         .type = CONFIG_TYPE_INT32,
         .offset = offsetof(joint_calib_t, neutral_us),
         .size = sizeof(int32_t),
-        .description = "PWM pulse width at neutral position (microseconds)",
+        // .description = "PWM pulse width at neutral position (microseconds)",
         .constraints = { .int_range = { 500, 3000 } }
     }
 };
@@ -1196,7 +1195,6 @@ static esp_err_t build_joint_param_info(int leg_index, int joint_index, const ch
     info->type = meta->type;
     info->offset = meta->offset;  // Offset within joint_calib_t
     info->size = meta->size;
-    info->description = meta->description;  // Point to the const string directly
     
     // Copy constraints based on type
     switch (meta->type) {
