@@ -109,12 +109,64 @@ No edits in `config_core` required once auto-registration is in place.
 - Manager loops until `stored == schema_version`.
 - Failure aborts init with logged error.
 
-## 9. Phased Refactor Plan
-Phase 1: Introduce descriptor struct + wrapper; keep current monolithic file mostly intact (system first).  
-Phase 2: Extract joint calibration into its own namespace implementation (dynamic params).  
-Phase 3: Route all public get/set through descriptor-driven access layer; remove direct table exposure.  
-Phase 4: Implement auto-registration (linker section or constructor).  
-Phase 5: Optional: pagination for large param sets; remove deprecated legacy metadata API fields.
+## 9. Phased Refactor Plan (with component extraction and code migration checkpoints)
+
+Phase 1 — Scaffold Core Interfaces (no behavioral change)
+- Add `components/config_core/include/config_core/namespace.h` with the descriptor type and value union.
+- Add `components/config_core/include/config_core/manager.h` with forward declarations mirroring current public API.
+- No code moved yet; `config_manager.c` remains the single implementation.
+- Goal: compile passes with headers available; zero runtime change.
+
+Phase 2 — Introduce Core Adapter Layer (minimal routing)
+- Create `components/config_core/src/access_api.c` implementing thin wrappers that call existing functions in `config_manager.c` (temporary).
+- Define a minimal in-process descriptor array in `config_manager.c` (still local) to prove the pattern without splitting.
+- Keep all namespace logic (system, joint_cal) in `config_manager.c`.
+- Checkpoint: build succeeds; unit tests pass; behavior unchanged.
+
+Phase 3 — Extract System Namespace Component
+- Create `components/config_ns_system/` with:
+  - `include/config_ns_system/system_config.h` (types already exist; move non-generic bits here).
+  - `src/system_namespace.c` implementing: `load_defaults_mem`, `init_defaults_nvs`, `load_from_nvs`, `save_to_nvs`, `find_param`, `get_value`, `set_value`, `list_param_names`.
+- Move system-specific tables and keys from `config_manager.c` into `system_namespace.c` (private scope).
+- In `config_manager.c`, replace direct calls with descriptor-based calls to the new component.
+- Checkpoint: only system namespace is fully migrated to component; joint_cal still monolithic.
+
+Phase 4 — Extract Joint Calibration Namespace Component (dynamic params)
+- Create `components/config_ns_joint_cal/` with:
+  - `include/config_ns_joint_cal/joint_cal_config.h` (public types).
+  - `src/joint_cal_namespace.c` implementing dynamic `list_param_names`, `find_param` via existing `parse_joint_param_name`, plus load/save/defaults.
+- Move joint calibration cache (`g_joint_calib_config`) and all NVS key formats out of `config_manager.c` into this component.
+- Checkpoint: both namespaces live in components; `config_manager.c` keeps global lifecycle and descriptor wiring.
+
+Phase 5 — Move Global Lifecycle into Config Core
+- Create `components/config_core/src/manager.c` implementing:
+  - Partition initialization (default + robot NVS).
+  - Descriptor iteration for per-namespace init, migration sequencing, and cache loads.
+  - Dirty tracking and `config_manager_save_namespace` routing via descriptors.
+- Trim `main/config_manager.c` to a thin façade or completely remove it if all public APIs are provided by `config_core`.
+- Checkpoint: All functionality resides under `components/config_core` + `components/config_ns_*`; `main/` contains no configuration logic.
+
+Phase 6 — Descriptor Registration Simplification
+- Initial: maintain a static descriptor array in `config_core/manager.c` referencing `extern` descriptors from each `config_ns_*`.
+- Optional upgrade: switch to linker section or constructor-based auto-registration to eliminate central edits when adding new namespaces.
+- Checkpoint: Adding new namespace requires only creating `components/config_ns_new/` with its descriptor; no edits elsewhere (post-upgrade).
+
+Phase 7 — Public API Routing and Deprecation
+- Route all `hexapod_config_get_*`/`set_*` calls through `config_core/src/access_api.c`, which resolves descriptors and uses `find_param` + `get_value`/`set_value`.
+- Remove any direct offset arithmetic or exposed static tables from public headers.
+- Keep backwards compatibility by preserving function signatures; mark legacy metadata fields (e.g., description) as optional/unused.
+- Checkpoint: RPC (`rpc_commands.c`) continues working via `config_get_parameter_info` and `config_list_parameters` implemented on top of descriptors.
+
+Phase 8 — Performance/UX Enhancements (optional)
+- Add pagination parameters to listing APIs used by RPC for very large sets.
+- Consider hash-based lookup caches inside namespaces if linear `find_param` becomes hot.
+- Remove deprecated fields from internal structs once RPC relies solely on type + constraints.
+
+Completion Criteria — "All code migrated"
+- All namespace-specific code resides in `components/config_ns_*`.
+- All lifecycle, routing, save/load orchestration resides in `components/config_core`.
+- `main/` no longer contains configuration logic; only includes and usage.
+- New namespace addition requires only a new component folder with descriptor + implementation (no edits in core post-registration upgrade).
 
 ## 10. Risks & Mitigations
 | Risk | Mitigation |
