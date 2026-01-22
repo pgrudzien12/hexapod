@@ -3,8 +3,7 @@
 
 #include "leg.h"
 #include "types/joint_types.h"
-
-#define NUM_LEGS 6
+#include "robot_constants.h"
 
 
 

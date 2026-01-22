@@ -17,6 +17,7 @@
 #include "nvs_flash.h"
 #include "controller.h"
 #include "types/joint_types.h"
+#include "robot_constants.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -39,10 +40,6 @@ extern const char* CONFIG_NAMESPACE_NAMES[CONFIG_NS_COUNT];
 // Joint Calibration Configuration Structure
 // =============================================================================
 
-// Number of legs and joints per leg
-#define NUM_LEGS 6
-#define NUM_JOINTS_PER_LEG 3
-
 
 
 // Complete joint calibration configuration for all legs and joints
@@ -54,25 +51,9 @@ typedef struct {
 } joint_calib_config_t;
 
 // =============================================================================
-// System Configuration Structure
+// System Configuration Structure (moved to component header)
 // =============================================================================
-
-typedef struct {
-    // Safety settings
-    bool emergency_stop_enabled;     // Emergency stop functionality
-    uint32_t auto_disarm_timeout;    // Auto-disarm timeout (seconds)
-    float safety_voltage_min;        // Minimum battery voltage (volts)
-    float temperature_limit_max;     // Maximum operating temperature (°C)
-    uint32_t motion_timeout_ms;      // Motion command timeout
-    uint32_t startup_delay_ms;       // Startup safety delay
-    uint32_t max_control_frequency;  // Maximum control loop frequency (Hz)
-    
-    // System identification
-    char robot_id[32];               // Unique robot identifier
-    char robot_name[64];             // Human-readable robot name
-    uint16_t config_version;         // Configuration schema version
-    controller_driver_type_e controller_type; // Default controller driver
-} system_config_t;
+#include "config_ns_system/system_config.h"
 
 // =============================================================================
 // Configuration Manager State

@@ -109,7 +109,7 @@ No edits in `config_core` required once auto-registration is in place.
 - Manager loops until `stored == schema_version`.
 - Failure aborts init with logged error.
 
-## 9. Phased Refactor Plan (with component extraction and code migration checkpoints)
+## 9. Phased Refactor Plan
 
 Phase 1 — Scaffold Core Interfaces (no behavioral change)
 - Add `components/config_core/include/config_core/namespace.h` with the descriptor type and value union.
@@ -126,9 +126,10 @@ Phase 2 — Introduce Core Adapter Layer (minimal routing)
 Phase 3 — Extract System Namespace Component
 - Create `components/config_ns_system/` with:
   - `include/config_ns_system/system_config.h` (types already exist; move non-generic bits here).
-  - `src/system_namespace.c` implementing: `load_defaults_mem`, `init_defaults_nvs`, `load_from_nvs`, `save_to_nvs`, `find_param`, `get_value`, `set_value`, `list_param_names`.
+  - `src/system_namespace.c` implementing: `load_defaults_mem`, `init_defaults_nvs`, `load_from_nvs`, `save_to_nvs` (dynamic param hooks can remain NULL in Phase 3).
+  - Define and expose `SYSTEM_NAMESPACE_DESCRIPTOR` and helpers `system_ns_get_descriptor()` and `system_ns_register_with_core()`.
 - Move system-specific tables and keys from `config_manager.c` into `system_namespace.c` (private scope).
-- In `config_manager.c`, replace direct calls with descriptor-based calls to the new component.
+- In `config_manager.c`, replace direct calls with component functions and register the descriptor with the core minimal registry.
 - Checkpoint: only system namespace is fully migrated to component; joint_cal still monolithic.
 
 Phase 4 — Extract Joint Calibration Namespace Component (dynamic params)
@@ -147,8 +148,9 @@ Phase 5 — Move Global Lifecycle into Config Core
 - Checkpoint: All functionality resides under `components/config_core` + `components/config_ns_*`; `main/` contains no configuration logic.
 
 Phase 6 — Descriptor Registration Simplification
-- Initial: maintain a static descriptor array in `config_core/manager.c` referencing `extern` descriptors from each `config_ns_*`.
-- Optional upgrade: switch to linker section or constructor-based auto-registration to eliminate central edits when adding new namespaces.
+- Initial: minimal runtime registry implemented in `config_core/manager.c` providing `config_core_register_namespace()` and `config_core_get_namespace()`.
+- Register descriptors from each `config_ns_*` via a helper (e.g., `system_ns_register_with_core()`), avoiding central edits.
+- Optional upgrade: switch to linker section or constructor-based auto-registration to eliminate any registration calls when adding new namespaces.
 - Checkpoint: Adding new namespace requires only creating `components/config_ns_new/` with its descriptor; no edits elsewhere (post-upgrade).
 
 Phase 7 — Public API Routing and Deprecation
@@ -189,11 +191,10 @@ Completion Criteria — "All code migrated"
 - This file serves as the living spec for the refactor until merged; after completion integrate into existing design docs.
 
 ## 13. Next Immediate Actions
-1. Scaffold `namespace.h` + value union + forward declarations (no logic changes).  
-2. Extract system namespace into `config_ns_system` component (descriptor + wrappers).  
-3. Adapt manager to iterate descriptors for initialization (still static array).  
-4. Migrate joint calibration namespace.  
-5. Replace legacy param table exposures with descriptor lookups.  
+1. Wire access API to use registry lookups for save/get/set where feasible (keep fallbacks).  
+2. Extract joint calibration namespace into `components/config_ns_joint_cal` (defaults, load/save, descriptor).  
+3. Register joint calibration descriptor during init, replace monolith calls.  
+4. Begin per-namespace migration versioning design and keys.  
 
 ---
 Prepared: 2025-11-23

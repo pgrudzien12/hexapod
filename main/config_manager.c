@@ -13,6 +13,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stddef.h>
+#include "config_ns_system/system_namespace.h"
 
 static const char *TAG = "config_mgr";
 
@@ -45,22 +46,7 @@ static system_config_t g_system_config = {0};
 // Configuration cache - joint calibration namespace
 static joint_calib_config_t g_joint_calib_config = {0};
 
-// =============================================================================
-// NVS Parameter Keys for System Namespace
-// =============================================================================
-
-// System configuration parameter keys
-#define SYS_KEY_EMERGENCY_STOP      "emerg_stop"
-#define SYS_KEY_AUTO_DISARM_TIMEOUT "auto_disarm"
-#define SYS_KEY_SAFETY_VOLTAGE_MIN  "volt_min"
-#define SYS_KEY_TEMP_LIMIT_MAX      "temp_max"
-#define SYS_KEY_MOTION_TIMEOUT      "motion_timeout"
-#define SYS_KEY_STARTUP_DELAY       "startup_delay"
-#define SYS_KEY_MAX_CONTROL_FREQ    "max_ctrl_freq"
-#define SYS_KEY_ROBOT_ID            "robot_id"
-#define SYS_KEY_ROBOT_NAME          "robot_name"
-#define SYS_KEY_CONFIG_VERSION      "config_ver"
-#define SYS_KEY_CONTROLLER_TYPE     "ctrl_type"
+// System namespace keys moved to component `config_ns_system`
 
 // =============================================================================
 // NVS Parameter Keys for Joint Calibration Namespace
@@ -193,47 +179,7 @@ static esp_err_t save_global_config_version(uint16_t version) {
 // Migration System
 // =============================================================================
 
-static esp_err_t init_system_defaults_to_nvs(void) {
-    nvs_handle_t handle = g_manager_state.nvs_handles[CONFIG_NS_SYSTEM];
-    
-    ESP_LOGI(TAG, "Initializing system namespace defaults to NVS");
-    
-    // Write default values to NVS (will be loaded later)
-    ESP_ERROR_CHECK(nvs_set_u8(handle, SYS_KEY_EMERGENCY_STOP, 1));  // true
-    ESP_ERROR_CHECK(nvs_set_u32(handle, SYS_KEY_AUTO_DISARM_TIMEOUT, 30));
-    ESP_ERROR_CHECK(nvs_set_u32(handle, SYS_KEY_MOTION_TIMEOUT, 1000));
-    ESP_ERROR_CHECK(nvs_set_u32(handle, SYS_KEY_STARTUP_DELAY, 2000));
-    ESP_ERROR_CHECK(nvs_set_u32(handle, SYS_KEY_MAX_CONTROL_FREQ, 100));
-    
-    // Float defaults as blobs
-    float default_voltage = 6.5f;
-    float default_temp = 80.0f;
-    ESP_ERROR_CHECK(nvs_set_blob(handle, SYS_KEY_SAFETY_VOLTAGE_MIN, &default_voltage, sizeof(float)));
-    ESP_ERROR_CHECK(nvs_set_blob(handle, SYS_KEY_TEMP_LIMIT_MAX, &default_temp, sizeof(float)));
-    
-    // Generate robot ID from MAC
-    char robot_id[32];
-    uint8_t mac[6];
-    esp_err_t err = esp_read_mac(mac, ESP_MAC_WIFI_STA);
-    if (err == ESP_OK) {
-        snprintf(robot_id, sizeof(robot_id), "HEXAPOD_%02X%02X%02X", mac[3], mac[4], mac[5]);
-    } else {
-        strcpy(robot_id, "HEXAPOD_DEFAULT");
-    }
-    ESP_ERROR_CHECK(nvs_set_str(handle, SYS_KEY_ROBOT_ID, robot_id));
-    ESP_ERROR_CHECK(nvs_set_str(handle, SYS_KEY_ROBOT_NAME, "My Hexapod Robot"));
-    
-    // Schema version for this namespace
-    ESP_ERROR_CHECK(nvs_set_u16(handle, SYS_KEY_CONFIG_VERSION, CONFIG_SCHEMA_VERSION));
-    
-    // Default controller type
-    ESP_ERROR_CHECK(nvs_set_u8(handle, SYS_KEY_CONTROLLER_TYPE, (uint8_t)CONTROLLER_DRIVER_FLYSKY_IBUS));
-
-    ESP_ERROR_CHECK(nvs_commit(handle));
-    ESP_LOGI(TAG, "System defaults written to NVS");
-    
-    return ESP_OK;
-}
+// System init defaults moved to component (system_ns_init_defaults_nvs)
 
 // =============================================================================
 // Joint Calibration Default Values (Single Source of Truth)
@@ -322,7 +268,8 @@ static esp_err_t migrate_v0_to_v1(void) {
     ESP_LOGI(TAG, "Migrating v0 -> v1: Initializing fresh configuration");
     
     // Initialize all namespaces with defaults
-    ESP_ERROR_CHECK(init_system_defaults_to_nvs());
+    // Initialize system namespace defaults via component
+    ESP_ERROR_CHECK(system_ns_init_defaults_nvs(g_manager_state.nvs_handles[CONFIG_NS_SYSTEM]));
     ESP_ERROR_CHECK(init_joint_calib_defaults_to_nvs());
     
     // Future: Add other namespace initialization here
@@ -386,99 +333,7 @@ static esp_err_t config_migrate_all(uint16_t from_version, uint16_t to_version) 
 // Helper Functions  
 // =============================================================================
 
-static esp_err_t load_system_config_from_nvs(void) {
-    nvs_handle_t handle = g_manager_state.nvs_handles[CONFIG_NS_SYSTEM];
-    esp_err_t err;
-    
-    ESP_LOGI(TAG, "Loading system configuration from NVS (read-only)");
-    
-    // PURE READ FUNCTION - No migration, no writes, assumes correct schema
-    size_t required_size = 0;
-    
-    // Boolean parameters
-    uint8_t temp_bool = 0;
-    err = nvs_get_u8(handle, SYS_KEY_EMERGENCY_STOP, &temp_bool);
-    if (err == ESP_OK) {
-        g_system_config.emergency_stop_enabled = (temp_bool != 0);
-    } else {
-        ESP_LOGW(TAG, "Failed to read emergency_stop, using default: %s", esp_err_to_name(err));
-    }
-    
-    // Integer parameters
-    err = nvs_get_u32(handle, SYS_KEY_AUTO_DISARM_TIMEOUT, &g_system_config.auto_disarm_timeout);
-    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
-        ESP_LOGW(TAG, "Failed to read auto_disarm_timeout: %s", esp_err_to_name(err));
-    }
-    
-    err = nvs_get_u32(handle, SYS_KEY_MOTION_TIMEOUT, &g_system_config.motion_timeout_ms);
-    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
-        ESP_LOGW(TAG, "Failed to read motion_timeout: %s", esp_err_to_name(err));
-    }
-    
-    err = nvs_get_u32(handle, SYS_KEY_STARTUP_DELAY, &g_system_config.startup_delay_ms);
-    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
-        ESP_LOGW(TAG, "Failed to read startup_delay: %s", esp_err_to_name(err));
-    }
-    
-    err = nvs_get_u32(handle, SYS_KEY_MAX_CONTROL_FREQ, &g_system_config.max_control_frequency);
-    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
-        ESP_LOGW(TAG, "Failed to read max_control_freq: %s", esp_err_to_name(err));
-    }
-    
-    // Float parameters (stored as blobs for precision)
-    required_size = sizeof(float);
-    err = nvs_get_blob(handle, SYS_KEY_SAFETY_VOLTAGE_MIN, &g_system_config.safety_voltage_min, &required_size);
-    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
-        ESP_LOGW(TAG, "Failed to read safety_voltage_min: %s", esp_err_to_name(err));
-    }
-    
-    required_size = sizeof(float);
-    err = nvs_get_blob(handle, SYS_KEY_TEMP_LIMIT_MAX, &g_system_config.temperature_limit_max, &required_size);
-    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
-        ESP_LOGW(TAG, "Failed to read temp_limit_max: %s", esp_err_to_name(err));
-    }
-    
-    // String parameters
-    required_size = sizeof(g_system_config.robot_id);
-    err = nvs_get_str(handle, SYS_KEY_ROBOT_ID, g_system_config.robot_id, &required_size);
-    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
-        ESP_LOGW(TAG, "Failed to read robot_id: %s", esp_err_to_name(err));
-    }
-    
-    required_size = sizeof(g_system_config.robot_name);
-    err = nvs_get_str(handle, SYS_KEY_ROBOT_NAME, g_system_config.robot_name, &required_size);
-    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
-        ESP_LOGW(TAG, "Failed to read robot_name: %s", esp_err_to_name(err));
-    }
-    
-    // Read namespace version
-    uint16_t namespace_version = 0;
-    err = nvs_get_u16(handle, SYS_KEY_CONFIG_VERSION, &namespace_version);
-    if (err == ESP_OK) {
-        g_system_config.config_version = namespace_version;
-    } else {
-        ESP_LOGW(TAG, "Failed to read namespace config version: %s", esp_err_to_name(err));
-        g_system_config.config_version = CONFIG_SCHEMA_VERSION;  // Assume current
-    }
-    
-    // Read controller type
-    uint8_t ctrl_type = 0;
-    err = nvs_get_u8(handle, SYS_KEY_CONTROLLER_TYPE, &ctrl_type);
-    if (err == ESP_OK) {
-        g_system_config.controller_type = (controller_driver_type_e)ctrl_type;
-    } else {
-        ESP_LOGW(TAG, "Failed to read controller_type, using default: %s", esp_err_to_name(err));
-        g_system_config.controller_type = CONTROLLER_DRIVER_FLYSKY_IBUS;
-    }
-
-    g_manager_state.namespace_loaded[CONFIG_NS_SYSTEM] = true;
-    g_manager_state.namespace_dirty[CONFIG_NS_SYSTEM] = false;
-    
-    ESP_LOGI(TAG, "System config loaded - robot_id=%s, robot_name=%s, version=%d", 
-             g_system_config.robot_id, g_system_config.robot_name, g_system_config.config_version);
-    
-    return ESP_OK;
-}
+// System load moved to component (system_ns_load_from_nvs)
 
 static esp_err_t load_joint_calib_config_from_nvs(void) {
     nvs_handle_t handle = g_manager_state.nvs_handles[CONFIG_NS_JOINT_CALIB];
@@ -555,46 +410,7 @@ static esp_err_t load_joint_calib_config_from_nvs(void) {
     return ESP_OK;
 }
 
-static esp_err_t save_system_config_to_nvs(void) {
-    nvs_handle_t handle = g_manager_state.nvs_handles[CONFIG_NS_SYSTEM];
-    esp_err_t err;
-    
-    ESP_LOGI(TAG, "Saving system configuration to NVS");
-    
-    // Save each parameter
-    uint8_t temp_bool = g_system_config.emergency_stop_enabled ? 1 : 0;
-    ESP_ERROR_CHECK(nvs_set_u8(handle, SYS_KEY_EMERGENCY_STOP, temp_bool));
-    ESP_ERROR_CHECK(nvs_set_u32(handle, SYS_KEY_AUTO_DISARM_TIMEOUT, g_system_config.auto_disarm_timeout));
-    ESP_ERROR_CHECK(nvs_set_u32(handle, SYS_KEY_MOTION_TIMEOUT, g_system_config.motion_timeout_ms));
-    ESP_ERROR_CHECK(nvs_set_u32(handle, SYS_KEY_STARTUP_DELAY, g_system_config.startup_delay_ms));
-    ESP_ERROR_CHECK(nvs_set_u32(handle, SYS_KEY_MAX_CONTROL_FREQ, g_system_config.max_control_frequency));
-    
-    // Float parameters as blobs
-    ESP_ERROR_CHECK(nvs_set_blob(handle, SYS_KEY_SAFETY_VOLTAGE_MIN, &g_system_config.safety_voltage_min, sizeof(float)));
-    ESP_ERROR_CHECK(nvs_set_blob(handle, SYS_KEY_TEMP_LIMIT_MAX, &g_system_config.temperature_limit_max, sizeof(float)));
-    
-    // String parameters
-    ESP_ERROR_CHECK(nvs_set_str(handle, SYS_KEY_ROBOT_ID, g_system_config.robot_id));
-    ESP_ERROR_CHECK(nvs_set_str(handle, SYS_KEY_ROBOT_NAME, g_system_config.robot_name));
-    
-    // Version
-    ESP_ERROR_CHECK(nvs_set_u16(handle, SYS_KEY_CONFIG_VERSION, g_system_config.config_version));
-    
-    // Controller type
-    ESP_ERROR_CHECK(nvs_set_u8(handle, SYS_KEY_CONTROLLER_TYPE, (uint8_t)g_system_config.controller_type));
-
-    // Commit changes
-    err = nvs_commit(handle);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to commit system config to NVS: %s", esp_err_to_name(err));
-        return err;
-    }
-    
-    g_manager_state.namespace_dirty[CONFIG_NS_SYSTEM] = false;
-    ESP_LOGI(TAG, "System configuration saved successfully");
-    
-    return ESP_OK;
-}
+// System save moved to component (system_ns_save_to_nvs)
 
 static esp_err_t save_joint_calib_config_to_nvs(void) {
     nvs_handle_t handle = g_manager_state.nvs_handles[CONFIG_NS_JOINT_CALIB];
@@ -665,6 +481,12 @@ esp_err_t config_manager_init(void) {
     }
     
     ESP_LOGI(TAG, "Initializing configuration manager");
+
+    // Register descriptors in core registry (Phase 4 minimal)
+    extern esp_err_t system_ns_register_with_core(void);
+    extern esp_err_t joint_cal_ns_register_with_core(void);
+    system_ns_register_with_core();
+    joint_cal_ns_register_with_core();
     
     // Initialize default NVS partition (for WiFi)
     err = nvs_flash_init();
@@ -747,16 +569,25 @@ esp_err_t config_manager_init(void) {
     
     // STEP 3: Load default configurations into memory cache
     config_load_system_defaults(&g_system_config);
-    config_load_joint_calib_defaults(&g_joint_calib_config);
+    const config_namespace_descriptor_t *joint_cal_desc = joint_cal_ns_get_descriptor();
+    joint_cal_desc->load_defaults_mem(&g_joint_calib_config);
     
     // STEP 4: Load configurations from NVS (guaranteed correct schema now)
-    err = load_system_config_from_nvs();
+    // Load system config via component
+    err = system_ns_load_from_nvs(g_manager_state.nvs_handles[CONFIG_NS_SYSTEM], &g_system_config);
+    if (err == ESP_OK) {
+        g_manager_state.namespace_loaded[CONFIG_NS_SYSTEM] = true;
+        g_manager_state.namespace_dirty[CONFIG_NS_SYSTEM] = false;
+        ESP_LOGI(TAG, "System config loaded - robot_id=%s, robot_name=%s, version=%d", 
+                 g_system_config.robot_id, g_system_config.robot_name, g_system_config.config_version);
+    }
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to load system config from NVS: %s", esp_err_to_name(err));
         return err;
     }
     
-    err = load_joint_calib_config_from_nvs();
+    extern esp_err_t joint_cal_ns_load_from_nvs(nvs_handle_t, joint_calib_config_t*);
+    err = joint_cal_ns_load_from_nvs(g_manager_state.nvs_handles[CONFIG_NS_JOINT_CALIB], &g_joint_calib_config);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to load joint calibration config from NVS: %s", esp_err_to_name(err));
         return err;
@@ -799,7 +630,7 @@ esp_err_t config_manager_save_namespace(config_namespace_t ns) {
     
     switch (ns) {
         case CONFIG_NS_SYSTEM:
-            return save_system_config_to_nvs();
+            return system_ns_save_to_nvs(g_manager_state.nvs_handles[CONFIG_NS_SYSTEM], &g_system_config);
         
         case CONFIG_NS_JOINT_CALIB:
             return save_joint_calib_config_to_nvs();
