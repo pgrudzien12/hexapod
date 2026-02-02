@@ -37,23 +37,10 @@ typedef enum {
 extern const char* CONFIG_NAMESPACE_NAMES[CONFIG_NS_COUNT];
 
 // =============================================================================
-// Joint Calibration Configuration Structure
-// =============================================================================
-
-
-
-// Complete joint calibration configuration for all legs and joints
-typedef struct {
-    // Joint calibration data indexed by [leg][joint]
-    // leg: 0-5 (LEG_LEFT_FRONT to LEG_RIGHT_REAR)
-    // joint: 0-2 (LEG_SERVO_COXA, LEG_SERVO_FEMUR, LEG_SERVO_TIBIA)
-    joint_calib_t joints[NUM_LEGS][NUM_JOINTS_PER_LEG];
-} joint_calib_config_t;
-
-// =============================================================================
-// System Configuration Structure (moved to component header)
+// Configuration Structure Headers (moved to component headers)
 // =============================================================================
 #include "config_ns_system/system_config.h"
+#include "config_ns_joint_cal/joint_cal_config.h"
 
 // =============================================================================
 // Configuration Manager State

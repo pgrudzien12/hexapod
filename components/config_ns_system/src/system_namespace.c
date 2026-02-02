@@ -1,4 +1,5 @@
 #include "config_ns_system/system_namespace.h"
+#include "config_core/manager.h"
 #include "esp_log.h"
 #include "esp_mac.h"
 #include "nvs.h"

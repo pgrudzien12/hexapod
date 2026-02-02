@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "controller.h" // for controller_driver_type_e
+#include "config_core/controller_types.h" // for controller_driver_type_e
 
 #ifdef __cplusplus
 extern "C" {

@@ -1,4 +1,5 @@
 #include "config_ns_joint_cal/joint_cal_namespace.h"
+#include "config_core/manager.h"
 #include "esp_log.h"
 #include <string.h>
 

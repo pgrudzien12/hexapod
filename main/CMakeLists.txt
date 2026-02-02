@@ -20,4 +20,5 @@ idf_component_register(
     "kpp_debug.c"
     "config_manager.c"
     INCLUDE_DIRS "."
+    REQUIRES config_core config_ns_system config_ns_joint_cal esp_netif bt driver
 )

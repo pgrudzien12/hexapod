@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <stddef.h>
 #include "config_ns_system/system_namespace.h"
+#include "config_ns_joint_cal/joint_cal_namespace.h"
 
 static const char *TAG = "config_mgr";
 
