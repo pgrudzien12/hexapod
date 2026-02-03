@@ -1,0 +1,23 @@
+# KiCad temp & cache
+*.bak
+*.kicad_prl
+*.kicad_prl.*
+*.kicad_sch-bak
+*.kicad_pcb-bak
+*.tmp
+_autosave-*
+*.lck
+
+# KiCad cache
+*.net
+*.dcm
+*.cache
+fp-info-cache
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+
+outputs/
+hexapod-backups/
