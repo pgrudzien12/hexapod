@@ -187,7 +187,8 @@
         }
       ],
       "track_widths": [
-        0.0
+        0.0,
+        0.5
       ],
       "tuning_pattern_settings": {
         "diff_pair_defaults": {
@@ -471,7 +472,7 @@
     "classes": [
       {
         "bus_width": 12,
-        "clearance": 0.6,
+        "clearance": 0.4,
         "diff_pair_gap": 0.25,
         "diff_pair_via_gap": 0.25,
         "diff_pair_width": 0.2,
@@ -482,7 +483,7 @@
         "pcb_color": "rgba(0, 0, 0, 0.000)",
         "priority": 2147483647,
         "schematic_color": "rgba(0, 0, 0, 0.000)",
-        "track_width": 1.0,
+        "track_width": 0.5,
         "via_diameter": 1.6,
         "via_drill": 0.3,
         "wire_width": 6
